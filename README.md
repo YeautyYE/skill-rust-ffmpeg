@@ -9,7 +9,7 @@
 
 ```bash
 /plugin marketplace add YeautyYE/skill-rust-ffmpeg
-/plugin install rust-ffmpeg@YeautyYE
+/plugin install rust-ffmpeg
 ```
 
 Or manually:
