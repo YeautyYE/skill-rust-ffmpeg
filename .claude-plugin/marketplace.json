@@ -1,0 +1,18 @@
+{
+  "name": "YeautyYE",
+  "owner": {
+    "name": "Yeauty"
+  },
+  "metadata": {
+    "description": "Plugins by Yeauty",
+    "homepage": "https://github.com/YeautyYE/skill-rust-ffmpeg"
+  },
+  "plugins": [
+    {
+      "name": "rust-ffmpeg",
+      "version": "1.0.0",
+      "source": ".",
+      "description": "Rust FFmpeg development guide - library selection, code generation, and problem solving for video/audio processing"
+    }
+  ]
+}
