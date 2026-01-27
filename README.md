@@ -8,13 +8,14 @@
 ## Installation
 
 ```bash
-/plugin install https://github.com/YeautyYE/skill-rust-ffmpeg
+/plugin marketplace add YeautyYE/skill-rust-ffmpeg
+/plugin install rust-ffmpeg@YeautyYE
 ```
 
 Or manually:
 ```bash
 git clone https://github.com/YeautyYE/skill-rust-ffmpeg.git
-cp -r skill-rust-ffmpeg/skills/rust-ffmpeg ~/.claude/skills/
+cp -r skill-rust-ffmpeg/plugin/skills/rust-ffmpeg ~/.claude/skills/
 ```
 
 ## Supported Libraries
@@ -33,14 +34,14 @@ How to use hardware acceleration for video encoding in Rust?
 
 ```
 skill-rust-ffmpeg/
-├── .claude-plugin/plugin.json
-├── skills/rust-ffmpeg/
-│   ├── SKILL.md
-│   └── references/
+├── .claude-plugin/marketplace.json
+├── plugin/
+│   ├── .claude-plugin/plugin.json
+│   └── skills/rust-ffmpeg/
+│       ├── SKILL.md
+│       └── references/
 └── README.md
 ```
-
-> **Why `skills/` subdirectory?** Claude Code plugin system expects `skills/<name>/`, manual install expects root. This uses plugin structure; manual install needs `cp -r`.
 
 ## License
 
