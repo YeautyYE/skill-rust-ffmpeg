@@ -1,0 +1,159 @@
+# Audio Extraction
+
+**Detection Keywords**: extract audio, audio only, how to extract audio from video, separate audio track, audio track, video to audio, mp3 extract, audio conversion, separate audio, loudness normalization, normalize audio, loudnorm, lufs, ebur128, volume normalize
+**Aliases**: audio extract, get audio, audio only, audio separation, audio normalization
+
+Extract audio tracks from video files across all Rust FFmpeg libraries.
+
+## Quick Example (30 seconds)
+
+```rust
+// ez-ffmpeg
+use ez_ffmpeg::{FfmpegContext, Output};
+
+FfmpegContext::builder()
+    .input("video.mp4")
+    .output(Output::from("audio.mp3")
+        .add_stream_map("0:a"))  // Map only audio stream
+    .build()?.start()?.wait()?;
+```
+
+```rust
+// ffmpeg-sidecar
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+FfmpegCommand::new()
+    .input("video.mp4")
+    .no_video()
+    .codec_audio("libmp3lame")
+    .output("audio.mp3")
+    .spawn()?.wait()?;
+```
+
+## Library Comparison
+
+| Aspect | ez-ffmpeg | ffmpeg-next | ffmpeg-sys-next | ffmpeg-sidecar |
+|--------|-----------|-------------|-----------------|----------------|
+| **Async support** | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Code complexity** | Low | Medium | High | Low |
+| **Type safety** | ✅ Full | ✅ Full | ⚠️ Unsafe | ✅ Full |
+| **Use when** | General tasks | Codec control | Max performance | No install |
+
+## Detailed Examples
+
+For detailed audio extraction examples, see library-specific guides:
+- **ez-ffmpeg**: [ez_ffmpeg/audio.md](../ez_ffmpeg/audio.md) - format conversion, codec selection, bitrate control, resampling, channel mapping
+- **ffmpeg-next**: [ffmpeg_next/audio.md](../ffmpeg_next/audio.md) - stream-level audio processing
+- **ffmpeg-sys-next**: [ffmpeg_sys_next/frame_codec.md](../ffmpeg_sys_next/frame_codec.md) - low-level audio operations
+- **ffmpeg-sidecar**: [ffmpeg_sidecar/audio.md](../ffmpeg_sidecar/audio.md) - CLI wrapper audio extraction
+
+## When to Choose
+
+See [Library Selection Guide](../library_selection.md) for detailed criteria.
+
+## Common Patterns
+
+### Extract audio to different formats
+```rust
+// ez-ffmpeg
+.output(Output::from("audio.mp3").add_stream_map("0:a"))
+.output(Output::from("audio.aac").add_stream_map("0:a"))
+
+// ffmpeg-sidecar
+.no_video()
+.codec_audio("libmp3lame")
+```
+
+### Control audio quality
+```rust
+// ez-ffmpeg
+.output(Output::from("audio.mp3")
+    .add_stream_map("0:a")
+    .set_audio_codec_opt("b", "192k"))
+
+// ffmpeg-sidecar
+.no_video()
+.args(["-b:a", "192k"])
+```
+
+### Extract specific audio track
+```rust
+// ez-ffmpeg
+.output(Output::from("audio.mp3")
+    .add_stream_map("0:a:1"))  // Second audio track
+
+// ffmpeg-sidecar
+.args(["-map", "0:a:1"])
+```
+
+### Loudness Normalization (EBU R128)
+
+Normalize audio to broadcast standards (-16 LUFS for streaming, -24 LUFS for TV).
+
+```rust
+// ez-ffmpeg - Basic normalization
+FfmpegContext::builder()
+    .input("input.mp4")
+    .filter_desc("loudnorm")
+    .output("normalized.mp3")
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg - With target parameters (streaming standard)
+FfmpegContext::builder()
+    .input("input.mp4")
+    .filter_desc("loudnorm=I=-16:TP=-1.5:LRA=11")
+    .output("normalized.mp3")
+    .build()?.start()?.wait()?;
+// I=-16: Target integrated loudness -16 LUFS
+// TP=-1.5: True peak limit -1.5 dBTP
+// LRA=11: Loudness range target 11 LU
+```
+
+```rust
+// ffmpeg-sidecar - Basic normalization
+FfmpegCommand::new()
+    .input("input.mp4")
+    .args(["-af", "loudnorm"])
+    .output("normalized.mp3")
+    .spawn()?.wait()?;
+
+// ffmpeg-sidecar - Two-pass for precise normalization
+// Pass 1: Analyze
+let output = FfmpegCommand::new()
+    .input("input.mp4")
+    .args(["-af", "loudnorm=print_format=json", "-f", "null", "-"])
+    .spawn()?.iter()?.collect_output();
+// Parse JSON output to get measured_I, measured_TP, measured_LRA, measured_thresh
+
+// Pass 2: Apply with measured values
+FfmpegCommand::new()
+    .input("input.mp4")
+    .args(["-af", &format!(
+        "loudnorm=I=-16:TP=-1.5:LRA=11:measured_I={}:measured_TP={}:measured_LRA={}:measured_thresh={}:linear=true",
+        measured_i, measured_tp, measured_lra, measured_thresh
+    )])
+    .output("normalized.mp3")
+    .spawn()?.wait()?;
+```
+
+```rust
+// ffmpeg-next - Filter graph approach
+let filter_spec = "loudnorm=I=-16:TP=-1.5:LRA=11";
+// See ffmpeg_next/filters.md for complete filter graph setup
+```
+
+**Common Target Standards**:
+| Standard | Integrated | True Peak | Use Case |
+|----------|------------|-----------|----------|
+| `-16 LUFS` | -16 | -1.5 dBTP | Streaming (Spotify, YouTube) |
+| `-14 LUFS` | -14 | -1.0 dBTP | Podcasts |
+| `-24 LUFS` | -24 | -2.0 dBTP | TV broadcast (EBU R128) |
+| `-24 LKFS` | -24 | -2.0 dBTP | US broadcast (ATSC A/85) |
+
+## Related Scenarios
+
+| Scenario | Guide |
+|----------|-------|
+| Video transcoding | [video_transcoding.md](video_transcoding.md) |
+| Batch processing | [batch_processing.md](batch_processing.md) |
+| Streaming | [streaming_rtmp_hls.md](streaming_rtmp_hls.md) |

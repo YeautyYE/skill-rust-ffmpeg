@@ -1,0 +1,9 @@
+{
+  "name": "rust-ffmpeg",
+  "version": "1.0.0",
+  "description": "Rust FFmpeg development guide - library selection, code generation, and problem solving for video/audio processing",
+  "author": {
+    "name": "Yeauty"
+  },
+  "repository": "https://github.com/YeautyYE/skill-rust-ffmpeg"
+}
