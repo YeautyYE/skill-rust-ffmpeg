@@ -176,6 +176,85 @@ FfmpegCommand::new()
 
 ---
 
+### ffmpeg-next Frame-Level Pipeline
+
+ffmpeg-next provides direct decode-encode control for advanced transcoding. The pattern transcodes video to H.264 while stream-copying audio and subtitle tracks:
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::{codec, decoder, encoder, format, frame, media, picture, Dictionary, Packet, Rational};
+use std::collections::HashMap;
+
+fn transcode_video(
+    input_path: &str,
+    output_path: &str,
+    x264_opts: &str,  // e.g., "preset=medium" or "preset=veryslow,crf=18"
+) -> Result<(), ffmpeg::Error> {
+    ffmpeg::init()?;
+
+    let mut ictx = format::input(input_path)?;
+    let mut octx = format::output(output_path)?;
+
+    let best_video = ictx.streams().best(media::Type::Video)
+        .map(|s| s.index());
+
+    let mut stream_mapping = vec![-1i32; ictx.nb_streams() as usize];
+    let mut ost_index = 0i32;
+
+    // Set up video transcoder + stream copy for audio/subtitles
+    for (ist_index, ist) in ictx.streams().enumerate() {
+        let medium = ist.parameters().medium();
+        if medium != media::Type::Video
+            && medium != media::Type::Audio
+            && medium != media::Type::Subtitle
+        { continue; }
+
+        stream_mapping[ist_index] = ost_index;
+        ost_index += 1;
+
+        if Some(ist_index) == best_video {
+            // Video: set up transcoder (decoder + encoder)
+            // ... see video_transcoding.md for full Transcoder struct
+        } else {
+            // Audio/subtitle: stream copy
+            let mut ost = octx.add_stream(encoder::find(codec::Id::None))?;
+            ost.set_parameters(ist.parameters());
+            unsafe { (*ost.parameters().as_mut_ptr()).codec_tag = 0; }
+        }
+    }
+
+    octx.write_header()?;
+
+    // Main packet loop
+    for (stream, mut packet) in ictx.packets() {
+        let ist_index = stream.index();
+        let ost_idx = stream_mapping[ist_index];
+        if ost_idx < 0 { continue; }
+
+        if Some(ist_index) == best_video {
+            // Decode → re-encode video
+            // decoder.send_packet(&packet) → receive_frame → encoder.send_frame → receive_packet
+        } else {
+            // Stream copy: rescale timestamps and write
+            let ost_tb = octx.stream(ost_idx as _).unwrap().time_base();
+            packet.rescale_ts(stream.time_base(), ost_tb);
+            packet.set_position(-1);
+            packet.set_stream(ost_idx as _);
+            packet.write_interleaved(&mut octx)?;
+        }
+    }
+
+    // Flush decoder and encoder EOF
+    octx.write_trailer()?;
+    Ok(())
+}
+```
+
+For the complete Transcoder struct with flush handling, see [video_transcoding.md](video_transcoding.md) and [ffmpeg_next/transcoding.md](../ffmpeg_next/transcoding.md).
+
+---
+
 ### Custom Frame Processing
 
 **Using ez-ffmpeg FrameFilter**:
@@ -198,16 +277,21 @@ impl FrameFilter for MyFilter {
 ## Decision Guide
 
 **Choose ez-ffmpeg if**:
-- Need custom frame processing
+- Need custom frame processing via FrameFilter
 - Async workflows required
-- Production application
-- Frame pipeline needed
+- Production application with multiple outputs
+- Simple API preferred
+
+**Choose ffmpeg-next if**:
+- Need frame-level decode-encode control
+- Need to integrate with custom codec settings (x264 options, etc.)
+- Building a video processing pipeline with precise timestamp management
 
 **Choose ffmpeg-sidecar if**:
 - CLI-style operations
 - Simple transcoding tasks
 - Cannot install FFmpeg libraries
-- Event-driven processing
+- Event-driven processing via stdout parsing
 
 ## Common Patterns
 

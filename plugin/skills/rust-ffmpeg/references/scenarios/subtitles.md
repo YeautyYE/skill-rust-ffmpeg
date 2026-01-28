@@ -89,6 +89,57 @@ FfmpegCommand::new()
     .spawn()?.wait()
 ```
 
+### ffmpeg-next Subtitle Stream Copy
+
+ffmpeg-next can extract or remux subtitle streams at the packet level (no decoding needed):
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::{codec, encoder, format, media};
+
+fn extract_subtitle(
+    input_path: &str,
+    output_path: &str,
+    sub_index: usize,  // 0 = first subtitle track
+) -> Result<(), ffmpeg::Error> {
+    ffmpeg::init()?;
+
+    let mut ictx = format::input(input_path)?;
+    let mut octx = format::output(output_path)?;
+
+    // Find the Nth subtitle stream
+    let sub_streams: Vec<usize> = ictx.streams()
+        .filter(|s| s.parameters().medium() == media::Type::Subtitle)
+        .map(|s| s.index())
+        .collect();
+    let ist_index = *sub_streams.get(sub_index)
+        .ok_or(ffmpeg::Error::StreamNotFound)?;
+
+    let ist = ictx.stream(ist_index).unwrap();
+    let ist_time_base = ist.time_base();
+
+    let mut ost = octx.add_stream(encoder::find(codec::Id::None))?;
+    ost.set_parameters(ist.parameters());
+
+    octx.write_header()?;
+
+    for (stream, mut packet) in ictx.packets() {
+        if stream.index() != ist_index { continue; }
+        let ost = octx.stream(0).unwrap();
+        packet.rescale_ts(ist_time_base, ost.time_base());
+        packet.set_position(-1);
+        packet.set_stream(0);
+        packet.write_interleaved(&mut octx)?;
+    }
+
+    octx.write_trailer()?;
+    Ok(())
+}
+```
+
+This is a packet-level operation (stream copy), so it runs near-instantly with no quality loss.
+
 ### Convert Format
 
 **Using ez-ffmpeg**:

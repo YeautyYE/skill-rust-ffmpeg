@@ -86,6 +86,126 @@ See [Library Selection Guide](../library_selection.md) for detailed criteria.
 .args(["-map", "0:a:1"])
 ```
 
+### ffmpeg-next Audio Transcoding
+
+ffmpeg-next provides frame-level control over audio processing via a decode-filter-encode pipeline. Based on the upstream `transcode-audio` example:
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::{codec, filter, format, frame, media};
+
+/// Transcode the best audio stream with an optional filter.
+/// Pass "anull" for direct copy, or a filter like "atempo=1.2" for speed change.
+fn transcode_audio(
+    input_path: &str,
+    output_path: &str,
+    filter_spec: &str,
+) -> Result<(), ffmpeg::Error> {
+    ffmpeg::init()?;
+
+    let mut ictx = format::input(input_path)?;
+    let mut octx = format::output(output_path)?;
+
+    // Find best audio stream and set up decoder
+    let input_stream = ictx.streams().best(media::Type::Audio)
+        .ok_or(ffmpeg::Error::StreamNotFound)?;
+    let stream_index = input_stream.index();
+    let in_time_base = input_stream.time_base();
+
+    let context = codec::context::Context::from_parameters(input_stream.parameters())?;
+    let mut decoder = context.decoder().audio()?;
+    decoder.set_parameters(input_stream.parameters())?;
+
+    // Set up encoder based on output format
+    let codec = ffmpeg::encoder::find(
+        octx.format().codec(output_path, media::Type::Audio)
+    ).ok_or(ffmpeg::Error::EncoderNotFound)?.audio()?;
+
+    let mut ost = octx.add_stream(codec)?;
+    let enc_context = codec::context::Context::from_parameters(ost.parameters())?;
+    let mut encoder = enc_context.encoder().audio()?;
+
+    let channel_layout = codec.channel_layouts()
+        .map(|cls| cls.best(decoder.channel_layout().channels()))
+        .unwrap_or(ffmpeg::channel_layout::ChannelLayout::STEREO);
+
+    encoder.set_rate(decoder.rate() as i32);
+    encoder.set_channel_layout(channel_layout);
+    encoder.set_format(codec.formats().expect("unknown formats").next().unwrap());
+    encoder.set_bit_rate(decoder.bit_rate());
+    encoder.set_time_base((1, decoder.rate() as i32));
+    ost.set_time_base((1, decoder.rate() as i32));
+
+    if octx.format().flags().contains(format::Flags::GLOBAL_HEADER) {
+        encoder.set_flags(codec::Flags::GLOBAL_HEADER);
+    }
+
+    let encoder = encoder.open_as(codec)?;
+    ost.set_parameters(&encoder);
+
+    // Set up filter graph (e.g., "anull" for passthrough, "loudnorm" for normalization)
+    let mut graph = filter::Graph::new();
+    let args = format!(
+        "time_base={}:sample_rate={}:sample_fmt={}:channel_layout=0x{:x}",
+        decoder.time_base(), decoder.rate(),
+        decoder.format().name(), decoder.channel_layout().bits()
+    );
+    graph.add(&filter::find("abuffer").unwrap(), "in", &args)?;
+    graph.add(&filter::find("abuffersink").unwrap(), "out", "")?;
+    {
+        let mut out = graph.get("out").unwrap();
+        out.set_sample_format(encoder.format());
+        out.set_channel_layout(encoder.channel_layout());
+        out.set_sample_rate(encoder.rate());
+    }
+    graph.output("in", 0)?.input("out", 0)?.parse(filter_spec)?;
+    graph.validate()?;
+
+    octx.write_header()?;
+    let out_time_base = octx.stream(0).unwrap().time_base();
+
+    // Decode → Filter → Encode loop
+    for (stream, mut packet) in ictx.packets() {
+        if stream.index() != stream_index { continue; }
+        packet.rescale_ts(stream.time_base(), decoder.time_base());
+        decoder.send_packet(&packet)?;
+
+        let mut decoded = frame::Audio::empty();
+        while decoder.receive_frame(&mut decoded).is_ok() {
+            decoded.set_pts(decoded.timestamp());
+            graph.get("in").unwrap().source().add(&decoded)?;
+
+            let mut filtered = frame::Audio::empty();
+            while graph.get("out").unwrap().sink().frame(&mut filtered).is_ok() {
+                encoder.send_frame(&filtered)?;
+                let mut encoded = ffmpeg::Packet::empty();
+                while encoder.receive_packet(&mut encoded).is_ok() {
+                    encoded.set_stream(0);
+                    encoded.rescale_ts(decoder.time_base(), out_time_base);
+                    encoded.write_interleaved(&mut octx)?;
+                }
+            }
+        }
+    }
+
+    // Flush
+    decoder.send_eof()?;
+    // ... flush decoder, filter, encoder (same pattern)
+
+    octx.write_trailer()?;
+    Ok(())
+}
+```
+
+Key points:
+- The filter graph bridges decoder output format to encoder input format.
+- Use `"anull"` filter for passthrough, `"loudnorm"` for normalization, `"atempo=1.2"` for speed change.
+- `set_frame_size` on the sink may be needed for codecs without `VARIABLE_FRAME_SIZE` capability.
+- Proper flush sequence: decoder EOF → filter flush → encoder EOF.
+
+For the complete working example, see [ffmpeg_next/audio.md](../ffmpeg_next/audio.md).
+
 ### Loudness Normalization (EBU R128)
 
 Normalize audio to broadcast standards (-16 LUFS for streaming, -24 LUFS for TV).

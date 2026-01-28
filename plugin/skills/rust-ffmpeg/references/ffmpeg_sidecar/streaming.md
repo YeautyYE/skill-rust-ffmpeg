@@ -20,7 +20,9 @@ Output video to separate named pipes (requires `named_pipes` feature):
 ```rust
 #[cfg(feature = "named_pipes")]
 use std::io::Read;
+use std::sync::mpsc;
 use ffmpeg_sidecar::command::FfmpegCommand;
+use ffmpeg_sidecar::event::FfmpegEvent;
 #[cfg(feature = "named_pipes")]
 use ffmpeg_sidecar::named_pipes::NamedPipe;
 #[cfg(feature = "named_pipes")]
@@ -42,10 +44,12 @@ fn video_pipe_output() -> anyhow::Result<()> {
 
     // Create pipe before spawning FFmpeg
     let mut video_pipe = NamedPipe::new(VIDEO_PIPE)?;
-    let mut child = command.spawn()?;
 
-    // Read from pipe (must drain to prevent deadlock)
-    std::thread::spawn(move || {
+    // Synchronization: reader must wait until FFmpeg starts writing (critical on Windows)
+    let (ready_tx, ready_rx) = mpsc::channel::<()>();
+
+    let reader = std::thread::spawn(move || {
+        ready_rx.recv().ok(); // Wait for FFmpeg to start
         let mut buf = vec![0; 320 * 240 * 3];
         let mut total = 0;
         while let Ok(n) = video_pipe.read(&mut buf) {
@@ -55,7 +59,20 @@ fn video_pipe_output() -> anyhow::Result<()> {
         println!("Read {} total bytes from video pipe", total);
     });
 
-    child.wait()?;
+    let mut child = command.spawn()?;
+    let mut ready_sent = false;
+
+    // Signal reader when FFmpeg starts producing output
+    for event in child.iter()? {
+        if !ready_sent {
+            if let FfmpegEvent::Progress(_) = &event {
+                ready_tx.send(()).ok();
+                ready_sent = true;
+            }
+        }
+    }
+
+    reader.join().ok();
     Ok(())
 }
 ```

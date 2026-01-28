@@ -220,7 +220,6 @@ use std::collections::BinaryHeap;
 use std::cmp::Reverse;
 use std::time::{Duration, Instant};
 
-#[derive(Clone)]
 struct TimestampedPacket {
     packet: Packet,
     pts: i64,
@@ -267,10 +266,10 @@ impl JitterBuffer {
     fn push(&mut self, packet: Packet) {
         let pts = packet.pts().unwrap_or(0);
 
-        // Drop if buffer is full and this packet is older than newest
+        // Drop if buffer is full and this packet is older than oldest buffered
         if self.buffer.len() >= self.max_size {
-            if let Some(Reverse(newest)) = self.buffer.peek() {
-                if pts < newest.pts {
+            if let Some(Reverse(oldest)) = self.buffer.peek() {
+                if pts < oldest.pts {
                     return; // Drop old packet
                 }
             }

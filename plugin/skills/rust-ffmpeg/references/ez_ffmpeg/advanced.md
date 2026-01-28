@@ -114,9 +114,9 @@ let input = Input::new_by_read_callback(move |buf: &mut [u8]| {
     let data = data_clone.lock().unwrap();
     let mut pos = pos_clone.lock().unwrap();
 
-    // Bounds check: return 0 (EOF) if position is at or past end
+    // EOF: return AVERROR_EOF when all data has been read
     if *pos >= data.len() {
-        return 0;
+        return ffmpeg_sys_next::AVERROR_EOF;
     }
 
     let remaining = &data[*pos..];
