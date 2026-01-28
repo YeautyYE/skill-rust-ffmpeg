@@ -80,6 +80,5 @@ MIT - see [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- [ez-ffmpeg](https://github.com/YeautyYE/ez-ffmpeg)
 - [ffmpeg-next](https://github.com/zmwangx/rust-ffmpeg)
 - [ffmpeg-sidecar](https://github.com/nathanbabcock/ffmpeg-sidecar)
