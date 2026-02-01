@@ -1,6 +1,6 @@
 ---
 name: rust-ffmpeg
-description: "Use when user asks to implement Rust functions/structs for: video processing, audio processing, media conversion, multimedia handling. Triggers: (1) 'Rust function' + video/audio/media/mp4/mp3/wav/flac/mkv/avi/mov, (2) 'implement'/'write'/'create' + extract audio/convert video/transcode/encode/decode, (3) struct/trait design for media processing (VideoProcessor, MediaInfo, FilterGraph, TranscodeTask, AudioResampler, StreamReader, FrameConverter), (4) FFmpeg terms: AVPacket, AVFrame, IOContext, filter graph, loudnorm, overlay, mux, demux, remux, (5) media operations: extract audio, convert to mp4, resize video, trim video, merge videos, add watermark, generate thumbnail, batch convert, normalize audio, (6) batch/bulk: 'all .wav/.mp3/.mp4 files', 'batch transcode', 'convert all', 'bulk convert', (7) media inspection: detect/check video/audio stream, has audio, video duration, video resolution, stream info, codec info, media metadata, (8) video effects: GIF generation, screenshot/frame capture, rotate video, fade in/out, crop/cropdetect, mono to stereo, PSNR quality, showwaves visualization, (9) low-level: memory read/write, shared memory, ref_counted_frames, send_packet, avformat_find_stream_info, CodecID, ffmpeg::Error, av_log callback, EAGAIN handling, (10) async/concurrent: async transcode, progress callback, thread pool, retry logic, timeout, watchdog, (11) streaming: RTMP, HLS, live stream, broadcast, jitter buffer, latency, real-time, (12) hardware acceleration: GPU, NVENC, VideoToolbox, VAAPI, QSV, cuda, hwaccel, (13) modern codecs: AV1, HEVC, H.265, VP9, HDR, 10-bit, (14) debugging/probe: ffprobe, probe, corrupt file, integrity, testsrc, frame count, (15) subtitles: subtitles, srt, ass, vtt, burn subs, embed subs, (16) device capture: screen capture, webcam, camera capture, record screen, avfoundation, directshow, v4l2, microphone input, desktop capture. Libraries: ez-ffmpeg, ffmpeg-next, ffmpeg-sys-next, ffmpeg-sidecar."
+description: "Use when user asks to implement, evaluate, compare, select, or migrate Rust code for: video processing, audio processing, media conversion, multimedia handling. Triggers: (1) 'Rust function' + video/audio/media/mp4/mp3/wav/flac/mkv/avi/mov, (2) 'implement'/'write'/'create' + extract audio/convert video/transcode/encode/decode, (3) struct/trait design for media processing (VideoProcessor, MediaInfo, FilterGraph, TranscodeTask, AudioResampler, StreamReader, FrameConverter), (4) FFmpeg terms: AVPacket, AVFrame, IOContext, filter graph, loudnorm, overlay, mux, demux, remux, (5) media operations: extract audio, convert to mp4, resize video, trim video, merge videos, add watermark, generate thumbnail, batch convert, normalize audio, (6) batch/bulk: 'all .wav/.mp3/.mp4 files', 'batch transcode', 'convert all', 'bulk convert', (7) media inspection: detect/check video/audio stream, has audio, video duration, video resolution, stream info, codec info, media metadata, (8) video effects: GIF generation, screenshot/frame capture, rotate video, fade in/out, crop/cropdetect, mono to stereo, PSNR quality, showwaves visualization, (9) low-level: memory read/write, shared memory, ref_counted_frames, send_packet, avformat_find_stream_info, CodecID, ffmpeg::Error, av_log callback, EAGAIN handling, (10) async/concurrent: async transcode, progress callback, thread pool, retry logic, timeout, watchdog, (11) streaming: RTMP, HLS, live stream, broadcast, jitter buffer, latency, real-time, (12) hardware acceleration: GPU, NVENC, VideoToolbox, VAAPI, QSV, cuda, hwaccel, (13) modern codecs: AV1, HEVC, H.265, VP9, HDR, 10-bit, (14) debugging/probe: ffprobe, probe, corrupt file, integrity, testsrc, frame count, (15) subtitles: subtitles, srt, ass, vtt, burn subs, embed subs, (16) device capture: screen capture, webcam, camera capture, record screen, avfoundation, directshow, v4l2, microphone input, desktop capture, (17) library selection/migration: 'which FFmpeg library', 'compare libraries', 'ez-ffmpeg vs ffmpeg-next', 'migrate to ez-ffmpeg', 'port to', 'convert to ez-ffmpeg', 'switch from', 'rewrite using', 'refactor to ez-ffmpeg', 'can this be done with ez-ffmpeg', 'feasibility', 'should I use ez-ffmpeg or ffmpeg-next', 'library recommendation', 'best library for', (18) existing FFmpeg code review: 'check FFmpeg code', 'review FFmpeg implementation', 'can this work with ez-ffmpeg', 'evaluate current FFmpeg code', 'is ez-ffmpeg suitable', 'look at existing video/audio code'. Libraries: ez-ffmpeg, ffmpeg-next, ffmpeg-sys-next, ffmpeg-sidecar."
 license: MIT
 metadata:
   author: Yeauty
@@ -54,6 +54,7 @@ If installation constrained → Load [ffmpeg_sidecar.md](references/ffmpeg_sidec
 | "screen capture", "webcam", "camera capture", "record screen", "avfoundation", "directshow", "v4l2", "device capture" | [capture.md](references/scenarios/capture.md) |
 | "AVPacket", "AVFrame", "keyframe", "GOP", "NALU", "bitstream", "EAGAIN", "decode loop", "memory", "packet" | [ffmpeg_next.md](references/ffmpeg_next.md) + [ffmpeg_sys_next.md](references/ffmpeg_sys_next.md) |
 | "custom io", "io context", "AVIOContext", "read callback", "write callback" | [custom_io.md](references/ffmpeg_sys_next/custom_io.md) |
+| "which library", "compare", "vs", "migrate to", "port to", "convert to", "switch from", "rewrite using", "feasibility", "should I use", "best library", "evaluate", "review FFmpeg code", "can this work with" | [library_selection.md](references/library_selection.md) |
 
 ### Layer 3: Library Selection
 
@@ -100,12 +101,19 @@ Why not 8.x (ffmpeg-next / ffmpeg-sys-next)? Upstream rust-ffmpeg issue [#246](h
 
 When this skill activates, follow this workflow:
 
+**For implementation tasks:**
 1. **Identify task** — Determine: video/audio/streaming/inspection? Simple or complex?
 2. **Select library** — Apply Layer 3 decision logic. State which library and why in one sentence
 3. **Load references** — Follow Layer 2 scenario detection to load the right reference files
 4. **Generate code** — Production-ready: proper error handling, `Result<>` return types, no `unwrap()` in library code
 5. **Explain briefly** — One-line summary of approach before the code block. No lengthy tutorials
 6. **Suggest next steps** — If applicable: performance optimization, hardware acceleration, or testing
+
+**For evaluation/migration/selection tasks:**
+1. **Load selection guide** — Load `library_selection.md` and relevant scenario references
+2. **Assess requirements** — Identify constraints: async needs, frame-level access, install limitations, existing code patterns
+3. **Compare options** — Apply Layer 3 decision logic against the specific use case
+4. **Give verdict** — Clear feasibility conclusion with rationale. If migration is possible, show key API differences. If not, explain why and recommend the alternative
 
 **Rules**:
 - Follow Layer 3 decision logic to select the library
@@ -124,6 +132,12 @@ When this skill activates, follow this workflow:
 
 **User**: "How to do RTMP live streaming in Rust?"
 **Claude**: Identify → streaming + real-time → ez-ffmpeg (async + RTMP server) → load `streaming_rtmp_hls.md` → generate RTMP push/server example → mention jitter buffer for production use
+
+**User**: "Can this video trimming code be converted to ez-ffmpeg? Fall back to ffmpeg-next if not"
+**Claude**: Identify → library migration feasibility → load `library_selection.md` + `video_transcoding.md` → review existing code against ez-ffmpeg API → assess feasibility → provide migration path or explain why ffmpeg-next is needed
+
+**User**: "Which Rust FFmpeg library should I use for my project?"
+**Claude**: Identify → library selection → load `library_selection.md` → ask about requirements (async? frame-level? install constraints?) → apply Layer 3 decision logic → recommend with rationale
 
 ## Best Practices
 
