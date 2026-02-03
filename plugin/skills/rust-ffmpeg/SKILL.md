@@ -86,7 +86,7 @@ New to Rust FFmpeg? See [quick_start.md](references/quick_start.md) for 5-minute
 
 | Library | Version | FFmpeg | Rust MSRV |
 |---------|---------|--------|-----------|
-| ez-ffmpeg | 0.7.0 | 7.x | 1.70+ |
+| ez-ffmpeg | 0.9.0 | 7.x | 1.70+ |
 | ffmpeg-next | 7.1.0 | 7.x | 1.63+ |
 | ffmpeg-sys-next | 7.1.0 | 7.x | 1.63+ |
 | ffmpeg-sidecar | 2.4.0 | Any | 1.70+ |

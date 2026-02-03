@@ -8,7 +8,7 @@ Quick patterns for integrating FFmpeg with web servers, storage systems, and asy
 > **Integration Dependencies** (used in examples below):
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.7.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.9.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > axum = "0.7"            # Web framework example
 > aws-sdk-s3 = "1"        # S3 integration example

@@ -17,7 +17,7 @@ Process multiple media files concurrently using async/parallel execution.
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.7.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.9.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > futures = "0.3"
 >

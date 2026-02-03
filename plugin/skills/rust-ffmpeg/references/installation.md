@@ -169,7 +169,7 @@ $env:VCPKGRS_DYNAMIC = "0"  # Force static linking
 **Cargo.toml**:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.7.0", features = ["static"] }
+ez-ffmpeg = { version = "0.9.0", features = ["static"] }
 # OR
 ffmpeg-next = { version = "7.1.0", features = ["static"] }
 ```
@@ -291,7 +291,7 @@ pkg-config --modversion libavutil    # 59.x
 
 # Test build
 cargo new --bin ffmpeg_test && cd ffmpeg_test
-echo 'ez-ffmpeg = "0.7.0"' >> Cargo.toml
+echo 'ez-ffmpeg = "0.9.0"' >> Cargo.toml
 cargo build --release
 ```
 
@@ -307,7 +307,7 @@ vcpkg integrate install
 # Test build (pkg-config/ffmpeg CLI may not be available)
 cargo new --bin ffmpeg_test
 cd ffmpeg_test
-Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.7.0", features = ["static"] }'
+Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.9.0", features = ["static"] }'
 cargo build --release
 ```
 
@@ -319,7 +319,7 @@ cargo build --release
 
 | Library | Version | FFmpeg Required | libavcodec Version |
 |---------|---------|-----------------|-------------------|
-| ez-ffmpeg | 0.7.0 | 7.x | 61.x |
+| ez-ffmpeg | 0.9.0 | 7.x | 61.x |
 | ffmpeg-next | 7.x | 7.x | 61.x |
 | ffmpeg-next | 6.x | 6.x | 60.x |
 | ffmpeg-next | 5.x | 5.x | 59.x |
@@ -338,7 +338,7 @@ When system FFmpeg installation is impossible (restricted environments, no admin
 ffmpeg-next = { version = "7.1.0", features = ["build"] }
 
 # ez-ffmpeg (inherits build capability)
-ez-ffmpeg = { version = "0.7.0", features = ["build"] }
+ez-ffmpeg = { version = "0.9.0", features = ["build"] }
 
 # With GPL codecs (x264, x265)
 ffmpeg-next = { version = "7.1.0", features = ["build", "build-license-gpl"] }

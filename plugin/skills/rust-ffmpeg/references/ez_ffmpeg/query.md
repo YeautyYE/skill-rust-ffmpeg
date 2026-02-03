@@ -155,6 +155,53 @@ for hw in hwaccels {
 //         vaapi/qsv (Intel), dxva2/d3d11va (Windows)
 ```
 
+## Packet-Level Scanning
+
+Scan media files at the packet level without decoding. Useful for inspecting timestamps, keyframes, and packet metadata.
+
+```rust
+use ez_ffmpeg::packet_scanner::PacketScanner;
+
+// Open file and iterate packets
+let mut scanner = PacketScanner::open("video.mp4")?;
+for packet in scanner.packets() {
+    let info = packet?;
+    println!(
+        "Stream #{}: pts={:?} dts={:?} size={} keyframe={}",
+        info.stream_index(),
+        info.pts(),
+        info.dts(),
+        info.size(),
+        info.is_keyframe(),
+    );
+}
+
+// Seek to specific timestamp (microseconds) and scan from there
+let mut scanner = PacketScanner::open("video.mp4")?;
+scanner.seek(5_000_000)?;  // Seek to 5 seconds
+let packet = scanner.next_packet()?;
+if let Some(info) = packet {
+    println!("First packet after seek: pts={:?}", info.pts());
+}
+
+// PacketInfo fields:
+// - stream_index(): usize - which stream this packet belongs to
+// - pts(): Option<i64> - presentation timestamp (stream time-base)
+// - dts(): Option<i64> - decompression timestamp (stream time-base)
+// - duration(): i64 - packet duration (stream time-base)
+// - size(): usize - packet data size in bytes
+// - pos(): i64 - byte position in file (-1 if unknown)
+// - is_keyframe(): bool - whether this is a keyframe
+// - is_corrupt(): bool - whether packet is flagged as corrupt
+```
+
+**Use cases**:
+- Analyze GOP structure and keyframe distribution
+- Verify timestamp continuity
+- Detect corrupt packets
+- Build custom seek logic
+- Media file integrity checking
+
 ## Probe with FFprobe (Alternative)
 
 For comprehensive media analysis, use ffprobe via command:

@@ -3,7 +3,7 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.7.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.9.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
 
@@ -215,7 +215,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.7.0", features = ["async"] }
+ez-ffmpeg = { version = "0.9.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -226,10 +226,10 @@ ez-ffmpeg = { version = "0.7.0", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.7.0", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.9.0", features = ["async", "static"] }
 
 # Build from source (last resort when system FFmpeg unavailable)
-ez-ffmpeg = { version = "0.7.0", features = ["async", "build"] }
+ez-ffmpeg = { version = "0.9.0", features = ["async", "build"] }
 ```
 
 > See [installation.md](installation.md) for detailed `build` feature usage and license options (GPL, non-free).

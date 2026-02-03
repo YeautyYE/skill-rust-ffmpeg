@@ -22,7 +22,7 @@ Use GPU and hardware encoders for faster video processing across all Rust FFmpeg
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg
-> ez-ffmpeg = "0.7.0"
+> ez-ffmpeg = "0.9.0"
 >
 > # For ffmpeg-next
 > ffmpeg-next = "7.1.0"

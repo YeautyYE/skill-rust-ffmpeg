@@ -452,6 +452,84 @@ pub fn check_file_integrity(path: &str) -> Result<FileIntegrity, IntegrityError>
 
 ### Deep Integrity Check (Scan Packets)
 
+**Using ez-ffmpeg PacketScanner** (recommended for simplicity):
+```rust
+use ez_ffmpeg::packet_scanner::PacketScanner;
+
+#[derive(Debug)]
+pub struct DeepIntegrityResult {
+    pub total_packets: usize,
+    pub keyframe_count: usize,
+    pub pts_discontinuities: usize,
+    pub missing_pts_count: usize,
+    pub is_truncated: bool,
+}
+
+pub fn deep_integrity_check(path: &str, expected_duration_us: Option<i64>) -> Result<DeepIntegrityResult, String> {
+    let mut scanner = PacketScanner::open(path)
+        .map_err(|e| format!("Cannot open file: {:?}", e))?;
+
+    let mut result = DeepIntegrityResult {
+        total_packets: 0,
+        keyframe_count: 0,
+        pts_discontinuities: 0,
+        missing_pts_count: 0,
+        is_truncated: false,
+    };
+
+    let mut last_pts: Option<i64> = None;
+    let mut max_pts: i64 = 0;
+
+    for packet in scanner.packets() {
+        let info = packet.map_err(|e| format!("Packet error: {:?}", e))?;
+        result.total_packets += 1;
+
+        if info.is_keyframe() {
+            result.keyframe_count += 1;
+        }
+
+        // Check PTS continuity
+        match info.pts() {
+            Some(pts) => {
+                if let Some(last) = last_pts {
+                    // Large backward jump indicates discontinuity
+                    if pts < last - 90000 { // ~1 second in 90kHz timebase
+                        result.pts_discontinuities += 1;
+                    }
+                }
+                max_pts = max_pts.max(pts);
+                last_pts = Some(pts);
+            }
+            None => result.missing_pts_count += 1,
+        }
+    }
+
+    // Check if file appears truncated
+    if let Some(expected) = expected_duration_us {
+        if expected > 0 && max_pts > 0 {
+            let actual_ratio = max_pts as f64 / expected as f64;
+            if actual_ratio < 0.9 {
+                result.is_truncated = true;
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+// Usage
+fn main() -> Result<(), String> {
+    let result = deep_integrity_check("video.mp4", Some(60_000_000))?; // 60s expected
+    println!("Packets: {}, Keyframes: {}", result.total_packets, result.keyframe_count);
+    if result.pts_discontinuities > 0 {
+        println!("Warning: {} PTS discontinuities", result.pts_discontinuities);
+    }
+    Ok(())
+}
+```
+**See also**: [ez_ffmpeg/query.md](../ez_ffmpeg/query.md)
+
+**Using ffmpeg-next** (for more control):
 ```rust
 extern crate ffmpeg_next as ffmpeg;
 
@@ -548,6 +626,168 @@ fn process_file_safely(path: &str) -> Result<(), String> {
 
     Ok(())
 }
+```
+
+## Keyframe & GOP Analysis
+
+Analyze keyframe distribution and GOP (Group of Pictures) structure for debugging encoding issues or optimizing seek performance.
+
+### Keyframe Detection with ez-ffmpeg
+
+```rust
+use ez_ffmpeg::packet_scanner::PacketScanner;
+
+/// Analyze keyframe distribution in a video file
+fn analyze_keyframes(path: &str) -> Result<(), String> {
+    let mut scanner = PacketScanner::open(path)
+        .map_err(|e| format!("Cannot open: {:?}", e))?;
+
+    let mut keyframe_pts: Vec<i64> = Vec::new();
+    let mut total_video_packets = 0;
+
+    for packet in scanner.packets() {
+        let info = packet.map_err(|e| format!("Packet error: {:?}", e))?;
+
+        // Only analyze video stream (typically stream 0)
+        if info.stream_index() == 0 {
+            total_video_packets += 1;
+            if info.is_keyframe() {
+                if let Some(pts) = info.pts() {
+                    keyframe_pts.push(pts);
+                }
+            }
+        }
+    }
+
+    println!("Total video packets: {}", total_video_packets);
+    println!("Keyframes found: {}", keyframe_pts.len());
+
+    // Calculate GOP sizes (frames between keyframes)
+    if keyframe_pts.len() > 1 {
+        let mut gop_sizes: Vec<i64> = Vec::new();
+        for i in 1..keyframe_pts.len() {
+            gop_sizes.push(keyframe_pts[i] - keyframe_pts[i - 1]);
+        }
+        let avg_gop = gop_sizes.iter().sum::<i64>() / gop_sizes.len() as i64;
+        println!("Average GOP interval (PTS units): {}", avg_gop);
+    }
+
+    Ok(())
+}
+```
+
+### GOP Structure Analysis
+
+```rust
+use ez_ffmpeg::packet_scanner::PacketScanner;
+
+#[derive(Debug)]
+pub struct GopAnalysis {
+    pub keyframe_count: usize,
+    pub avg_gop_frames: f64,
+    pub min_gop_frames: usize,
+    pub max_gop_frames: usize,
+    pub keyframe_intervals_ms: Vec<f64>,
+}
+
+pub fn analyze_gop_structure(path: &str, time_base_num: i32, time_base_den: i32) -> Result<GopAnalysis, String> {
+    let mut scanner = PacketScanner::open(path)
+        .map_err(|e| format!("Cannot open: {:?}", e))?;
+
+    let mut keyframe_pts: Vec<i64> = Vec::new();
+    let mut frames_since_keyframe = 0usize;
+    let mut gop_frame_counts: Vec<usize> = Vec::new();
+
+    for packet in scanner.packets() {
+        let info = packet.map_err(|e| format!("Packet error: {:?}", e))?;
+
+        if info.stream_index() == 0 { // Video stream
+            if info.is_keyframe() {
+                if frames_since_keyframe > 0 {
+                    gop_frame_counts.push(frames_since_keyframe);
+                }
+                frames_since_keyframe = 0;
+                if let Some(pts) = info.pts() {
+                    keyframe_pts.push(pts);
+                }
+            }
+            frames_since_keyframe += 1;
+        }
+    }
+
+    // Don't forget the last GOP
+    if frames_since_keyframe > 0 {
+        gop_frame_counts.push(frames_since_keyframe);
+    }
+
+    // Calculate keyframe intervals in milliseconds
+    let time_base = time_base_num as f64 / time_base_den as f64;
+    let mut intervals_ms: Vec<f64> = Vec::new();
+    for i in 1..keyframe_pts.len() {
+        let interval_pts = keyframe_pts[i] - keyframe_pts[i - 1];
+        intervals_ms.push(interval_pts as f64 * time_base * 1000.0);
+    }
+
+    let avg_gop = if gop_frame_counts.is_empty() {
+        0.0
+    } else {
+        gop_frame_counts.iter().sum::<usize>() as f64 / gop_frame_counts.len() as f64
+    };
+
+    Ok(GopAnalysis {
+        keyframe_count: keyframe_pts.len(),
+        avg_gop_frames: avg_gop,
+        min_gop_frames: gop_frame_counts.iter().copied().min().unwrap_or(0),
+        max_gop_frames: gop_frame_counts.iter().copied().max().unwrap_or(0),
+        keyframe_intervals_ms: intervals_ms,
+    })
+}
+
+// Usage
+fn main() -> Result<(), String> {
+    // Typical video: 1/90000 timebase (90kHz)
+    let analysis = analyze_gop_structure("video.mp4", 1, 90000)?;
+    println!("Keyframes: {}", analysis.keyframe_count);
+    println!("Average GOP size: {:.1} frames", analysis.avg_gop_frames);
+    println!("GOP range: {} - {} frames", analysis.min_gop_frames, analysis.max_gop_frames);
+
+    // Check for irregular GOPs (streaming issues)
+    if analysis.max_gop_frames > analysis.min_gop_frames * 2 {
+        println!("Warning: Irregular GOP sizes detected");
+    }
+    Ok(())
+}
+```
+**See also**: [ez_ffmpeg/query.md](../ez_ffmpeg/query.md)
+
+### Seek to Keyframe
+
+```rust
+use ez_ffmpeg::packet_scanner::PacketScanner;
+
+/// Find the nearest keyframe at or after a given timestamp
+fn find_keyframe_at(path: &str, target_us: i64) -> Result<Option<i64>, String> {
+    let mut scanner = PacketScanner::open(path)
+        .map_err(|e| format!("Cannot open: {:?}", e))?;
+
+    // Seek to target position
+    scanner.seek(target_us)
+        .map_err(|e| format!("Seek failed: {:?}", e))?;
+
+    // Find next keyframe
+    for packet in scanner.packets() {
+        let info = packet.map_err(|e| format!("Packet error: {:?}", e))?;
+        if info.stream_index() == 0 && info.is_keyframe() {
+            return Ok(info.pts());
+        }
+    }
+
+    Ok(None)
+}
+
+// Usage: Find keyframe nearest to 10 seconds
+let keyframe_pts = find_keyframe_at("video.mp4", 10_000_000)?;
+println!("Keyframe PTS: {:?}", keyframe_pts);
 ```
 
 ## Advanced Topics

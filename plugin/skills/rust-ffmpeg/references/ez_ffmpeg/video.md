@@ -136,7 +136,7 @@ FfmpegContext::builder()
 ## Resolution & FPS
 
 ```rust
-use ez_ffmpeg::{FfmpegContext, Output};
+use ez_ffmpeg::{FfmpegContext, Input, Output};
 use ez_ffmpeg::AVRational;
 
 // Scale to 1280x720
@@ -165,6 +165,21 @@ FfmpegContext::builder()
     .input("input.mp4")
     .output(Output::from("output.mp4")
         .set_framerate(AVRational { num: 30, den: 1 }))
+    .build()?.start()?.wait()?;
+
+// Set input framerate (for DTS estimation or raw streams)
+// Useful for streams without proper timestamps or when forcing a specific input rate
+FfmpegContext::builder()
+    .input(Input::from("raw_video.yuv")
+        .set_framerate(30, 1))  // Force 30fps input
+    .output("output.mp4")
+    .build()?.start()?.wait()?;
+
+// Set input framerate for 23.976fps (NTSC film)
+FfmpegContext::builder()
+    .input(Input::from("video.mp4")
+        .set_framerate(24000, 1001))  // 23.976fps
+    .output("output.mp4")
     .build()?.start()?.wait()?;
 
 // Combined: scale + fps
