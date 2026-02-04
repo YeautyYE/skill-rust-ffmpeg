@@ -113,7 +113,9 @@ Implement `FrameFilter` trait for custom frame processing:
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::{FfmpegContext, Input, Output, Frame, AVMediaType};
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 
 struct GrayscaleFilter;
 
@@ -173,7 +175,8 @@ crossbeam-channel = "0.5"
 ```rust
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::{Frame, AVMediaType};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 use crossbeam_channel::{Receiver, Sender};
 
 struct FrameReceiveFilter {
@@ -218,7 +221,8 @@ For sending frames to external processing:
 ```rust
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::{Frame, AVMediaType};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 use crossbeam_channel::Sender;
 
 struct FrameSenderFilter {
@@ -250,7 +254,8 @@ impl FrameFilter for FrameSenderFilter {
 ```rust
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::{Frame, AVMediaType};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 
 struct VolumeFilter {
     gain: f32,
@@ -282,7 +287,8 @@ For audio filters that need specific sample format (e.g., float planar for proce
 ```rust
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::{Frame, AVMediaType};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 
 struct AudioProcessFilter {
     gain: f32,
@@ -358,6 +364,158 @@ impl FrameFilter for AudioProcessFilter {
 }
 ```
 
+## Custom Tile Filter Example (Advanced)
+
+A complete example showing how to create a custom video filter that tiles the input frame into a 2x2 grid:
+
+**Prerequisites**: Add dependencies to your `Cargo.toml`:
+```toml
+[dependencies]
+ez-ffmpeg = "0.10.0"
+ffmpeg-next = "7.1.0"
+ffmpeg-sys-next = "7.1.0"
+log = "0.4"
+env_logger = "0.11"
+```
+
+**tile_filter.rs** - The custom filter implementation:
+```rust
+use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
+use ez_ffmpeg::util::ffmpeg_utils::av_err2str;
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::{av_frame_copy_props, av_frame_get_buffer, AVMediaType, AVPixelFormat};
+
+/// Creates a 2x2 tiled output from input frame.
+/// Input: 320x240 → Output: 640x480
+/// Requirements: YUV420P format, even dimensions
+pub struct Tile2x2Filter;
+
+impl Tile2x2Filter {
+    pub fn new() -> Self { Self }
+
+    fn validate_frame(&self, frame: &Frame) -> Result<(), String> {
+        unsafe {
+            let width = (*frame.as_ptr()).width;
+            let height = (*frame.as_ptr()).height;
+            let format: AVPixelFormat = std::mem::transmute((*frame.as_ptr()).format);
+
+            if format != AVPixelFormat::AV_PIX_FMT_YUV420P {
+                return Err(format!(
+                    "Unsupported pixel format: {:?}. Add .filter_desc(\"format=yuv420p\") before this filter.",
+                    format
+                ));
+            }
+            if width % 2 != 0 || height % 2 != 0 {
+                return Err(format!("Dimensions must be even. Got: {}x{}", width, height));
+            }
+        }
+        Ok(())
+    }
+
+    unsafe fn copy_plane_to_tiles(
+        &self, src_data: *const u8, src_linesize: i32,
+        dst_data: *mut u8, dst_linesize: i32,
+        plane_width: usize, plane_height: usize,
+    ) {
+        for tile_y in 0..2 {
+            for tile_x in 0..2 {
+                let dst_offset_x = tile_x * plane_width;
+                let dst_offset_y = tile_y * plane_height;
+                for row in 0..plane_height {
+                    let src_row = src_data.add(row * src_linesize as usize);
+                    let dst_row = dst_data.add((dst_offset_y + row) * dst_linesize as usize + dst_offset_x);
+                    std::ptr::copy_nonoverlapping(src_row, dst_row, plane_width);
+                }
+            }
+        }
+    }
+}
+
+impl FrameFilter for Tile2x2Filter {
+    fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
+
+    fn init(&mut self, ctx: &FrameFilterContext) -> Result<(), String> {
+        log::info!("Initializing Tile2x2Filter: {}", ctx.name());
+        Ok(())
+    }
+
+    fn filter_frame(&mut self, frame: Frame, _ctx: &FrameFilterContext) -> Result<Option<Frame>, String> {
+        unsafe {
+            if frame.as_ptr().is_null() || frame.is_empty() {
+                return Ok(Some(frame));
+            }
+        }
+        self.validate_frame(&frame)?;
+
+        unsafe {
+            let w = (*frame.as_ptr()).width;
+            let h = (*frame.as_ptr()).height;
+
+            let mut out = Frame::empty();
+            (*out.as_mut_ptr()).width = w * 2;
+            (*out.as_mut_ptr()).height = h * 2;
+            (*out.as_mut_ptr()).format = (*frame.as_ptr()).format;
+
+            let ret = av_frame_get_buffer(out.as_mut_ptr(), 0);
+            if ret < 0 { return Err(format!("Buffer alloc failed: {}", av_err2str(ret))); }
+
+            av_frame_copy_props(out.as_mut_ptr(), frame.as_ptr());
+
+            // Copy Y plane (full resolution)
+            self.copy_plane_to_tiles(
+                (*frame.as_ptr()).data[0], (*frame.as_ptr()).linesize[0],
+                (*out.as_mut_ptr()).data[0], (*out.as_mut_ptr()).linesize[0],
+                w as usize, h as usize,
+            );
+            // Copy U plane (half resolution)
+            self.copy_plane_to_tiles(
+                (*frame.as_ptr()).data[1], (*frame.as_ptr()).linesize[1],
+                (*out.as_mut_ptr()).data[1], (*out.as_mut_ptr()).linesize[1],
+                (w / 2) as usize, (h / 2) as usize,
+            );
+            // Copy V plane (half resolution)
+            self.copy_plane_to_tiles(
+                (*frame.as_ptr()).data[2], (*frame.as_ptr()).linesize[2],
+                (*out.as_mut_ptr()).data[2], (*out.as_mut_ptr()).linesize[2],
+                (w / 2) as usize, (h / 2) as usize,
+            );
+
+            Ok(Some(out))
+        }
+    }
+}
+```
+
+**main.rs** - Using the custom filter:
+```rust
+mod tile_filter;
+
+use crate::tile_filter::Tile2x2Filter;
+use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ez_ffmpeg::{FfmpegContext, Output};
+use ffmpeg_sys_next::AVMediaType;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
+    let pipeline: FramePipelineBuilder = AVMediaType::AVMEDIA_TYPE_VIDEO.into();
+    let pipeline = pipeline.filter("tile_2x2", Box::new(Tile2x2Filter::new()));
+
+    FfmpegContext::builder()
+        .input("input.mp4")
+        .filter_desc("format=yuv420p")  // Required: convert to YUV420P
+        .output(Output::from("output.mp4").add_frame_pipeline(pipeline))
+        .build()?
+        .start()?
+        .wait()?;
+
+    Ok(())
+}
+```
+
+**Full example**: See `examples/custom_tile_filter/` in ez-ffmpeg repository
+
 ## OpenGL Filters (GPU Acceleration)
 
 Enable with `features = ["opengl"]`:
@@ -365,7 +523,8 @@ Enable with `features = ["opengl"]`:
 ```rust
 use ez_ffmpeg::opengl::opengl_frame_filter::OpenGLFrameFilter;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::{FfmpegContext, Output, AVMediaType};
+use ez_ffmpeg::{FfmpegContext, Output};
+use ffmpeg_sys_next::AVMediaType;
 
 // Fragment shader for video effects (e.g., color inversion)
 let fragment_shader = r#"

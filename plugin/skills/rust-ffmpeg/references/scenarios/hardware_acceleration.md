@@ -22,7 +22,7 @@ Use GPU and hardware encoders for faster video processing across all Rust FFmpeg
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg
-> ez-ffmpeg = "0.9.0"
+> ez-ffmpeg = "0.10.0"
 >
 > # For ffmpeg-next
 > ffmpeg-next = "7.1.0"
@@ -558,6 +558,329 @@ let output = Output::from("output.mp4")
 | **Code complexity** | Low | Medium | High | Low |
 | **Type safety** | Full | Full | Unsafe | Full |
 | **Use when** | General tasks | Codec control | Max performance | No install |
+
+## Per-Library Hardware Support
+
+Understanding what each library actually supports for hardware acceleration:
+
+### ez-ffmpeg
+
+**Full hardware acceleration support** via high-level API:
+
+```rust
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+use ez_ffmpeg::hwaccel::get_hwaccels;
+
+// Runtime detection built-in
+let available = get_hwaccels();
+
+// Simple hwaccel configuration
+let input = Input::from("input.mp4")
+    .set_hwaccel("cuda")                    // Decoder acceleration
+    .set_hwaccel_device("/dev/dri/renderD128")  // Device selection (VAAPI)
+    .set_hwaccel_output_format("cuda")      // Keep frames on GPU
+    .set_video_codec("h264_cuvid");         // Hardware decoder
+
+let output = Output::from("output.mp4")
+    .set_video_codec("h264_nvenc")          // Hardware encoder
+    .set_video_codec_opt("preset", "p4");   // Encoder options
+```
+
+**Supported features**:
+- ✅ All hwaccel backends (cuda, videotoolbox, vaapi, qsv, d3d11va, d3d12va, vulkan)
+- ✅ Hardware decoder selection
+- ✅ Hardware encoder selection
+- ✅ Device path specification
+- ✅ GPU frame format preservation (`hwaccel_output_format`)
+- ✅ Runtime availability detection
+- ✅ Encoder-specific options
+
+### ffmpeg-next
+
+**Hardware acceleration requires manual FFI setup**. The safe Rust API doesn't expose hardware context creation directly—you must use `ffmpeg_sys_next` for device initialization:
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+use ffmpeg::{codec, encoder, format};
+
+// Software encoding works out of the box
+let codec = encoder::find(codec::Id::H264).unwrap();  // libx264
+
+// Hardware encoding requires:
+// 1. Create hw_device_ctx via ffmpeg_sys_next
+// 2. Set hw_frames_ctx on encoder
+// 3. Manage GPU memory manually
+
+// Example: Software transcode (no hwaccel)
+fn software_transcode(input: &str, output: &str) -> Result<(), ffmpeg::Error> {
+    ffmpeg::init()?;
+    let mut ictx = format::input(input)?;
+    let mut octx = format::output(output)?;
+    // ... standard decode/encode loop with libx264
+    Ok(())
+}
+
+// For hardware: see ffmpeg_sys_next section below
+```
+
+**Supported features**:
+- ✅ Software codecs (libx264, libx265, libvpx, etc.)
+- ⚠️ Hardware codecs require FFI (unsafe code)
+- ❌ No built-in hwaccel detection
+- ❌ No high-level hardware context API
+
+### ffmpeg-sys-next
+
+**Full hardware access via unsafe FFI**. Required for hardware acceleration with ffmpeg-next:
+
+```rust
+use ffmpeg_sys_next::*;
+use std::ptr;
+
+/// Create hardware device context for CUDA
+unsafe fn create_cuda_device() -> Result<*mut AVBufferRef, String> {
+    let mut hw_device_ctx: *mut AVBufferRef = ptr::null_mut();
+
+    let ret = av_hwdevice_ctx_create(
+        &mut hw_device_ctx,
+        AVHWDeviceType::AV_HWDEVICE_TYPE_CUDA,
+        ptr::null(),  // Default device
+        ptr::null_mut(),
+        0,
+    );
+
+    if ret < 0 {
+        return Err(format!("Failed to create CUDA device: {}", ret));
+    }
+
+    Ok(hw_device_ctx)
+}
+
+/// Create hardware device context for VAAPI
+unsafe fn create_vaapi_device(device_path: &str) -> Result<*mut AVBufferRef, String> {
+    let mut hw_device_ctx: *mut AVBufferRef = ptr::null_mut();
+    let device = std::ffi::CString::new(device_path).unwrap();
+
+    let ret = av_hwdevice_ctx_create(
+        &mut hw_device_ctx,
+        AVHWDeviceType::AV_HWDEVICE_TYPE_VAAPI,
+        device.as_ptr(),
+        ptr::null_mut(),
+        0,
+    );
+
+    if ret < 0 {
+        return Err(format!("Failed to create VAAPI device: {}", ret));
+    }
+
+    Ok(hw_device_ctx)
+}
+
+/// Check available hardware device types
+unsafe fn list_hw_device_types() -> Vec<AVHWDeviceType> {
+    let mut types = Vec::new();
+    let mut hw_type = AVHWDeviceType::AV_HWDEVICE_TYPE_NONE;
+
+    loop {
+        hw_type = av_hwdevice_iterate_types(hw_type);
+        if hw_type == AVHWDeviceType::AV_HWDEVICE_TYPE_NONE {
+            break;
+        }
+        types.push(hw_type);
+    }
+
+    types
+}
+```
+
+**Supported features**:
+- ✅ Full FFmpeg C API access
+- ✅ Hardware device context creation
+- ✅ Hardware frame context management
+- ✅ All hwaccel types supported by FFmpeg
+- ⚠️ Requires unsafe code throughout
+- ⚠️ Manual memory management
+
+### ffmpeg-sidecar
+
+**Hardware acceleration via CLI flags**. Passes arguments directly to ffmpeg binary:
+
+```rust
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+// Hardware acceleration via CLI arguments
+FfmpegCommand::new()
+    .hwaccel("cuda")                    // -hwaccel cuda
+    .args(["-hwaccel_device", "0"])     // Select GPU
+    .args(["-hwaccel_output_format", "cuda"])  // Keep on GPU
+    .input("input.mp4")
+    .codec_video("h264_nvenc")          // -c:v h264_nvenc
+    .args(["-preset", "p4"])            // Encoder preset
+    .output("output.mp4")
+    .spawn()?.wait()?;
+
+// Detection via CLI probe
+fn detect_hwaccels() -> Vec<String> {
+    let output = std::process::Command::new("ffmpeg")
+        .args(["-hide_banner", "-hwaccels"])
+        .output()
+        .expect("ffmpeg not found");
+
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .skip(1)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+```
+
+**Supported features**:
+- ✅ All hwaccel backends (whatever ffmpeg binary supports)
+- ✅ Hardware encoder/decoder selection
+- ✅ Full encoder option passthrough
+- ✅ Detection via `-hwaccels` probe
+- ⚠️ Depends on installed ffmpeg binary capabilities
+- ⚠️ No compile-time validation of options
+
+### Library Selection Guide for Hardware Acceleration
+
+| Requirement | Recommended Library |
+|-------------|---------------------|
+| Simple hwaccel with runtime detection | **ez-ffmpeg** |
+| CLI-style hwaccel, no FFmpeg install | **ffmpeg-sidecar** |
+| Frame-level control + hwaccel | **ffmpeg-next** + **ffmpeg-sys-next** |
+| Maximum performance, full control | **ffmpeg-sys-next** |
+| Cross-platform auto-selection | **ez-ffmpeg** |
+
+## Additional Hardware Platforms
+
+### Windows — D3D11VA (DirectX 11)
+
+D3D11VA provides hardware decoding on Windows with DirectX 11 compatible GPUs (NVIDIA, AMD, Intel):
+
+```rust
+// ez-ffmpeg — D3D11VA decode
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+fn transcode_d3d11va(input_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let input = Input::from(input_path)
+        .set_hwaccel("d3d11va");  // DirectX 11 Video Acceleration
+
+    let output = Output::from(output_path)
+        .set_video_codec("h264_nvenc")  // Or h264_amf, h264_qsv, h264_mf
+        .set_audio_codec("aac");
+
+    FfmpegContext::builder()
+        .input(input)
+        .output(output)
+        .build()?
+        .start()?
+        .wait()?;
+
+    Ok(())
+}
+```
+
+```rust
+// ffmpeg-sidecar — D3D11VA decode
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+FfmpegCommand::new()
+    .hwaccel("d3d11va")
+    .input("input.mp4")
+    .codec_video("h264_nvenc")
+    .output("output.mp4")
+    .spawn()?.wait()?;
+```
+
+### Windows — DXVA2 (DirectX 9)
+
+DXVA2 provides legacy hardware decoding on older Windows systems:
+
+```rust
+// ez-ffmpeg — DXVA2 decode (legacy Windows)
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+fn transcode_dxva2(input_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let input = Input::from(input_path)
+        .set_hwaccel("dxva2");  // DirectX Video Acceleration 2
+
+    let output = Output::from(output_path)
+        .set_video_codec("libx264")  // Software encode (DXVA2 is decode-only)
+        .set_audio_codec("aac");
+
+    FfmpegContext::builder()
+        .input(input)
+        .output(output)
+        .build()?
+        .start()?
+        .wait()?;
+
+    Ok(())
+}
+```
+
+**Note**: DXVA2 is decode-only. For hardware encoding on Windows, use D3D11VA/D3D12VA with NVENC, AMF, QSV, or Media Foundation encoders.
+
+### Intel — VAAPI (Linux)
+
+Intel GPUs on Linux use VAAPI (not just AMD). Requires `intel-media-driver` or `libva-intel-driver`:
+
+```rust
+// ez-ffmpeg — Intel VAAPI (Linux)
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+fn transcode_intel_vaapi(input_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Intel iGPU typically at /dev/dri/renderD128
+    let input = Input::from(input_path)
+        .set_hwaccel("vaapi")
+        .set_hwaccel_device("/dev/dri/renderD128");
+
+    let output = Output::from(output_path)
+        .set_video_codec("h264_vaapi")
+        .set_audio_codec("aac");
+
+    FfmpegContext::builder()
+        .input(input)
+        .output(output)
+        .build()?
+        .start()?
+        .wait()?;
+
+    Ok(())
+}
+```
+
+```rust
+// ffmpeg-sidecar — Intel VAAPI
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+FfmpegCommand::new()
+    .hwaccel("vaapi")
+    .args(["-hwaccel_device", "/dev/dri/renderD128"])
+    .args(["-hwaccel_output_format", "vaapi"])
+    .input("input.mp4")
+    .codec_video("h264_vaapi")
+    .args(["-qp", "23"])  // Quality parameter
+    .output("output.mp4")
+    .spawn()?.wait()?;
+```
+
+### Expanded Platform Support Matrix
+
+| Platform | hwaccel | Decoder | Encoder | Driver/SDK |
+|----------|---------|---------|---------|------------|
+| **macOS (Apple Silicon)** | `videotoolbox` | auto | `h264_videotoolbox`, `hevc_videotoolbox` | Built-in |
+| **macOS (Intel)** | `videotoolbox` | auto | `h264_videotoolbox` | Built-in |
+| **NVIDIA (all)** | `cuda` | `h264_cuvid`, `hevc_cuvid` | `h264_nvenc`, `hevc_nvenc`, `av1_nvenc` | NVIDIA Driver |
+| **Intel (Windows)** | `qsv` | `h264_qsv`, `hevc_qsv` | `h264_qsv`, `hevc_qsv`, `av1_qsv` | Intel Media SDK |
+| **Intel (Linux)** | `vaapi` | auto | `h264_vaapi`, `hevc_vaapi`, `av1_vaapi` | intel-media-driver |
+| **AMD (Windows)** | `d3d11va` | auto | `h264_amf`, `hevc_amf`, `av1_amf` | AMD AMF SDK |
+| **AMD (Linux)** | `vaapi` | auto | `h264_vaapi`, `hevc_vaapi` | Mesa AMDGPU |
+| **Windows (generic)** | `d3d11va` | auto | `h264_mf` | Media Foundation |
+| **Windows (legacy)** | `dxva2` | auto | (software only) | DirectX 9 |
+| **Windows (DX12)** | `d3d12va` | auto | `h264_mf` | DirectX 12 |
 
 ## Detailed Library References
 

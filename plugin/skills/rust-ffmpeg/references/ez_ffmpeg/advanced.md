@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-- ez-ffmpeg 0.9.0+ with FFmpeg 7.x
+- ez-ffmpeg 0.10.0+ with FFmpeg 7.x
 - For hardware acceleration: GPU drivers and codec support
   - macOS: VideoToolbox (built-in)
   - Linux: VAAPI/NVENC drivers
@@ -288,8 +288,10 @@ Progress monitoring uses a custom FrameFilter:
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::{FfmpegContext, Output, Frame, AVMediaType, AVRational};
+use ez_ffmpeg::{FfmpegContext, Output};
 use ez_ffmpeg::container_info::get_duration_us;
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::{AVMediaType, AVRational};
 use std::sync::Arc;
 
 struct ProgressTracker {
@@ -341,9 +343,10 @@ For operations ez-ffmpeg doesn't expose directly, use ffmpeg-next (re-exported):
 ```rust
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::{Frame, AVMediaType};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 
-// Note: ffmpeg_next types are re-exported through ez_ffmpeg
+// Note: For advanced operations, add ffmpeg-next as a direct dependency
 // For advanced operations, add ffmpeg-next as a direct dependency
 
 struct CustomVideoFilter {
@@ -420,12 +423,13 @@ scheduler.abort();
 For frame processing without writing to file:
 
 ```rust
-use ez_ffmpeg::{FfmpegContext, Input, Frame};
+use ez_ffmpeg::{FfmpegContext, Input};
 use ez_ffmpeg::core::context::null_output::create_null_output;
 use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::AVMediaType;
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 
 // Define a frame processor
 struct FrameCounter {
@@ -469,7 +473,8 @@ use ez_ffmpeg::filter::frame_filter::FrameFilter;
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::core::context::null_output::create_null_output;
-use ez_ffmpeg::{Frame, AVMediaType};
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 use crossbeam_channel::{bounded, Receiver, Sender};
 
 // Create channel for frame passing

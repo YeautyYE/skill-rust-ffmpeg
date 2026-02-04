@@ -421,6 +421,311 @@ FfmpegCommand::new()
 | `flush_packets` | Output buffering | 0 (buffered) |
 | `fflags +genpts` | Generate missing PTS | Always for unreliable sources |
 
+## Additional Streaming Protocols
+
+### SRT (Secure Reliable Transport)
+
+SRT is a modern protocol designed for low-latency, reliable streaming over unpredictable networks. It provides encryption, error correction, and adaptive bitrate.
+
+```rust
+// ez-ffmpeg: SRT output (caller mode - connect to listener)
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+FfmpegContext::builder()
+    .input("input.mp4")
+    .output(Output::from("srt://destination:9000?mode=caller")
+        .set_format("mpegts")
+        .set_video_codec("libx264")
+        .set_video_codec_opt("preset", "fast")
+        .set_audio_codec("aac"))
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg: SRT input (listener mode - wait for connection)
+FfmpegContext::builder()
+    .input(Input::from("srt://0.0.0.0:9000?mode=listener")
+        .set_input_opt("timeout", "5000000"))  // 5s connection timeout
+    .output(Output::from("output.mp4")
+        .set_video_codec("copy")
+        .set_audio_codec("copy"))
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg: SRT with encryption and latency tuning
+FfmpegContext::builder()
+    .input("input.mp4")
+    .output(Output::from("srt://destination:9000?mode=caller&latency=200000&passphrase=mysecret&pbkeylen=16")
+        .set_format("mpegts"))
+    .build()?.start()?.wait()?;
+```
+
+```rust
+// ffmpeg-sidecar: SRT streaming
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+// SRT caller (push to listener)
+FfmpegCommand::new()
+    .input("input.mp4")
+    .args(["-f", "mpegts"])
+    .codec_video("libx264")
+    .args(["-preset", "fast"])
+    .codec_audio("aac")
+    .output("srt://destination:9000?mode=caller")
+    .spawn()?.wait()?;
+
+// SRT listener (receive from caller)
+FfmpegCommand::new()
+    .args(["-timeout", "5000000"])
+    .input("srt://0.0.0.0:9000?mode=listener")
+    .codec_video("copy")
+    .codec_audio("copy")
+    .output("received.mp4")
+    .spawn()?.wait()?;
+```
+
+**SRT Parameters**:
+| Parameter | Purpose | Typical Value |
+|-----------|---------|---------------|
+| `mode` | Connection mode | `caller`, `listener`, `rendezvous` |
+| `latency` | Buffer latency (μs) | 200000 (200ms) for stable, 20000 for ultra-low |
+| `passphrase` | Encryption key | 10-79 characters |
+| `pbkeylen` | Key length | 16, 24, or 32 bytes |
+| `timeout` | Connection timeout (μs) | 5000000 (5s) |
+| `maxbw` | Max bandwidth (bytes/s) | 0 = unlimited |
+
+---
+
+### UDP Streaming
+
+UDP provides the lowest latency but no reliability guarantees. Best for local networks or when packet loss is acceptable.
+
+```rust
+// ez-ffmpeg: UDP unicast output
+use ez_ffmpeg::{FfmpegContext, Output};
+
+FfmpegContext::builder()
+    .input("input.mp4")
+    .output(Output::from("udp://192.168.1.100:1234")
+        .set_format("mpegts")
+        .set_format_opt("pkt_size", "1316")  // Optimal for MPEG-TS
+        .set_video_codec("libx264")
+        .set_video_codec_opt("preset", "ultrafast")
+        .set_video_codec_opt("tune", "zerolatency"))
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg: UDP multicast output
+FfmpegContext::builder()
+    .input("input.mp4")
+    .output(Output::from("udp://239.0.0.1:1234?ttl=2")
+        .set_format("mpegts")
+        .set_format_opt("pkt_size", "1316"))
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg: UDP input (receive stream)
+FfmpegContext::builder()
+    .input(Input::from("udp://0.0.0.0:1234")
+        .set_input_opt("buffer_size", "65535")
+        .set_input_opt("fifo_size", "1000000"))
+    .output("received.mp4")
+    .build()?.start()?.wait()?;
+```
+
+```rust
+// ffmpeg-sidecar: UDP streaming
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+// UDP unicast
+FfmpegCommand::new()
+    .input("input.mp4")
+    .args(["-f", "mpegts", "-pkt_size", "1316"])
+    .codec_video("libx264")
+    .args(["-preset", "ultrafast", "-tune", "zerolatency"])
+    .output("udp://192.168.1.100:1234")
+    .spawn()?.wait()?;
+
+// UDP multicast with TTL
+FfmpegCommand::new()
+    .input("input.mp4")
+    .args(["-f", "mpegts"])
+    .output("udp://239.0.0.1:1234?ttl=2")
+    .spawn()?.wait()?;
+
+// Receive UDP stream
+FfmpegCommand::new()
+    .args(["-buffer_size", "65535", "-fifo_size", "1000000"])
+    .input("udp://0.0.0.0:1234")
+    .output("received.mp4")
+    .spawn()?.wait()?;
+```
+
+**UDP Parameters**:
+| Parameter | Purpose | Typical Value |
+|-----------|---------|---------------|
+| `pkt_size` | UDP packet size | 1316 (MPEG-TS optimal) |
+| `buffer_size` | Socket buffer | 65535-1048576 |
+| `fifo_size` | Circular buffer | 1000000 |
+| `ttl` | Multicast TTL | 1-255 (2 for local network) |
+| `localaddr` | Bind to specific interface | IP address |
+
+---
+
+### RTSP (Real Time Streaming Protocol)
+
+RTSP is commonly used for IP cameras and surveillance systems. FFmpeg can both receive and serve RTSP streams.
+
+```rust
+// ez-ffmpeg: Receive RTSP stream (IP camera)
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+FfmpegContext::builder()
+    .input(Input::from("rtsp://admin:password@192.168.1.100:554/stream1")
+        .set_input_opt("rtsp_transport", "tcp")  // TCP for reliability
+        .set_input_opt("stimeout", "5000000")    // 5s timeout
+        .set_input_opt("buffer_size", "1048576"))
+    .output(Output::from("recording.mp4")
+        .set_video_codec("copy")
+        .set_audio_codec("copy"))
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg: RTSP to HLS conversion (camera to web)
+FfmpegContext::builder()
+    .input(Input::from("rtsp://camera:554/live")
+        .set_input_opt("rtsp_transport", "tcp"))
+    .output(Output::from("stream/playlist.m3u8")
+        .set_format("hls")
+        .set_format_opt("hls_time", "2")
+        .set_format_opt("hls_list_size", "5")
+        .set_format_opt("hls_flags", "delete_segments")
+        .set_video_codec("libx264")
+        .set_video_codec_opt("preset", "fast"))
+    .build()?.start()?.wait()?;
+
+// ez-ffmpeg: RTSP to RTMP re-streaming
+FfmpegContext::builder()
+    .input(Input::from("rtsp://camera:554/live")
+        .set_input_opt("rtsp_transport", "tcp"))
+    .output(Output::from("rtmp://server/live/camera1")
+        .set_format("flv")
+        .set_video_codec("copy")
+        .set_audio_codec("aac"))
+    .build()?.start()?.wait()?;
+```
+
+```rust
+// ffmpeg-sidecar: RTSP operations
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+// Receive RTSP with TCP transport
+FfmpegCommand::new()
+    .args(["-rtsp_transport", "tcp"])
+    .args(["-stimeout", "5000000"])
+    .input("rtsp://admin:password@192.168.1.100:554/stream1")
+    .codec_video("copy")
+    .codec_audio("copy")
+    .output("recording.mp4")
+    .spawn()?.wait()?;
+
+// RTSP to HLS
+FfmpegCommand::new()
+    .args(["-rtsp_transport", "tcp"])
+    .input("rtsp://camera:554/live")
+    .args(["-f", "hls", "-hls_time", "2", "-hls_list_size", "5"])
+    .codec_video("libx264")
+    .args(["-preset", "fast"])
+    .output("stream/playlist.m3u8")
+    .spawn()?.wait()?;
+```
+
+**RTSP Parameters**:
+| Parameter | Purpose | Typical Value |
+|-----------|---------|---------------|
+| `rtsp_transport` | Transport protocol | `tcp` (reliable), `udp` (low latency) |
+| `stimeout` | Socket timeout (μs) | 5000000 (5s) |
+| `buffer_size` | Input buffer | 1048576 (1MB) |
+| `allowed_media_types` | Filter streams | `video`, `audio`, `data` |
+| `initial_pause` | Start paused | 0 or 1 |
+
+---
+
+### Re-streaming Patterns
+
+Common patterns for receiving streams and forwarding to other destinations.
+
+```rust
+// ez-ffmpeg: Multi-destination re-streaming
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+// Stream to multiple RTMP destinations
+FfmpegContext::builder()
+    .input(Input::from("rtsp://camera:554/live")
+        .set_input_opt("rtsp_transport", "tcp"))
+    .output(Output::from("rtmp://server1/live/stream")
+        .set_format("flv")
+        .set_video_codec("copy")
+        .set_audio_codec("aac"))
+    .output(Output::from("rtmp://server2/live/stream")
+        .set_format("flv")
+        .set_video_codec("copy")
+        .set_audio_codec("aac"))
+    .build()?.start()?.wait()?;
+
+// Protocol conversion: SRT → RTMP
+FfmpegContext::builder()
+    .input(Input::from("srt://0.0.0.0:9000?mode=listener"))
+    .output(Output::from("rtmp://server/live/stream")
+        .set_format("flv")
+        .set_video_codec("copy")
+        .set_audio_codec("copy"))
+    .build()?.start()?.wait()?;
+
+// Protocol conversion: RTMP → SRT
+FfmpegContext::builder()
+    .input(Input::from("rtmp://source/live/stream"))
+    .output(Output::from("srt://destination:9000?mode=caller")
+        .set_format("mpegts")
+        .set_video_codec("copy")
+        .set_audio_codec("copy"))
+    .build()?.start()?.wait()?;
+```
+
+```rust
+// ffmpeg-sidecar: Re-streaming with tee muxer (single encode, multiple outputs)
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+FfmpegCommand::new()
+    .input("rtsp://camera:554/live")
+    .args(["-f", "tee"])
+    .args(["-map", "0:v", "-map", "0:a"])
+    .codec_video("libx264")
+    .args(["-preset", "fast"])
+    .codec_audio("aac")
+    // Tee to multiple destinations
+    .output("[f=flv]rtmp://server1/live/stream|[f=flv]rtmp://server2/live/stream|[f=hls:hls_time=2]stream/playlist.m3u8")
+    .spawn()?.wait()?;
+```
+
+---
+
+### Protocol Comparison
+
+| Protocol | Latency | Reliability | Encryption | Use Case |
+|----------|---------|-------------|------------|----------|
+| **RTMP** | Low (~1-3s) | TCP-based | RTMPS | Live streaming to platforms |
+| **HLS** | High (~10-30s) | HTTP-based | HTTPS | VOD, wide compatibility |
+| **SRT** | Ultra-low (~200ms) | ARQ-based | AES | Professional broadcast |
+| **UDP** | Ultra-low (~50ms) | None | None | Local networks, multicast |
+| **RTSP** | Low (~500ms) | TCP/UDP | Basic auth | IP cameras, surveillance |
+
+### Protocol Selection Guide
+
+| Scenario | Recommended Protocol | Reason |
+|----------|---------------------|--------|
+| Stream to YouTube/Twitch | RTMP | Platform requirement |
+| Web playback (any device) | HLS | Universal browser support |
+| Professional contribution | SRT | Low latency + reliability |
+| Local network broadcast | UDP multicast | Lowest latency, efficient |
+| IP camera recording | RTSP | Camera standard protocol |
+| Unreliable network | SRT | Built-in error correction |
+| Encrypted transmission | SRT or RTMPS | Native encryption support |
+
 ## Related Scenarios
 
 | Scenario | Guide |

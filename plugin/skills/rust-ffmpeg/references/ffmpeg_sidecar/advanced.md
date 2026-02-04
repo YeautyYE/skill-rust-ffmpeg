@@ -1,9 +1,16 @@
 # ffmpeg-sidecar: Advanced Topics
 
-**Detection Keywords**: terminal video, ascii art, whisper integration, custom filter, experimental, game of life
-**Aliases**: advanced sidecar, terminal render, whisper
+**Detection Keywords**: terminal video, ascii art, whisper integration, custom filter, experimental, game of life, ffplay preview, pipe to ffplay
+**Aliases**: advanced sidecar, terminal render, whisper, ffplay debug
 
-Terminal video rendering, Whisper integration, custom filters, and experimental features.
+Terminal video rendering, ffplay preview, Whisper integration, custom filters, and experimental features.
+
+> **Dependencies**: Examples use `anyhow` for error handling:
+> ```toml
+> [dependencies]
+> ffmpeg-sidecar = "2.4.0"
+> anyhow = "1"
+> ```
 
 ## Related Guides
 
@@ -97,6 +104,79 @@ fn graceful_shutdown(input: &str, output: &str) -> anyhow::Result<()> {
 ```
 
 See [Core API](core.md) for complete advanced features reference.
+
+## FFplay Preview Pipeline
+
+Pipe FFmpeg output to ffplay for real-time debugging and preview:
+
+```rust
+use std::io::{Read, Write};
+use std::process::{Command, Stdio};
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+fn ffplay_preview() -> anyhow::Result<()> {
+    // Generate test video with FFmpeg
+    let mut ffmpeg = FfmpegCommand::new()
+        .realtime()
+        .format("lavfi")
+        .input("testsrc=size=1920x1080:rate=60")
+        .codec_video("rawvideo")
+        .format("avi")
+        .output("-")
+        .spawn()?;
+
+    // Start ffplay to receive the stream
+    let mut ffplay = Command::new("ffplay")
+        .args(["-i", "-"])
+        .stdin(Stdio::piped())
+        .spawn()?;
+
+    let mut ffmpeg_stdout = ffmpeg.take_stdout().unwrap();
+    let mut ffplay_stdin = ffplay.stdin.take().unwrap();
+
+    // Pipe from ffmpeg stdout to ffplay stdin
+    let buf = &mut [0u8; 4096];
+    loop {
+        let n = ffmpeg_stdout.read(buf)?;
+        if n == 0 {
+            break;
+        }
+        ffplay_stdin.write_all(&buf[..n])?;
+    }
+
+    Ok(())
+}
+```
+
+**Full example**: See `examples/ffplay_preview.rs` in ffmpeg-sidecar repository
+
+## Game of Life Filter Preview
+
+Preview Conway's Game of Life using FFmpeg's `life` filter with ffplay:
+
+```rust
+use std::process::Command;
+
+fn game_of_life_preview() -> anyhow::Result<()> {
+    // Use ffplay to display the life filter visualization
+    // life filter parameters:
+    //   s=300x200     - grid size
+    //   mold=10       - mold effect (dying cells leave trails)
+    //   r=60          - frame rate
+    //   ratio=0.08    - initial cell density
+    //   death_color   - color of dying cells
+    //   life_color    - color of living cells
+    Command::new("ffplay")
+        .arg("-hide_banner")
+        .arg("-f").arg("lavfi")
+        .arg("-i").arg("life=s=300x200:mold=10:r=60:ratio=0.08:death_color=#C83232:life_color=#00ff00,scale=1200:800:flags=16")
+        .spawn()?
+        .wait()?;
+    Ok(())
+}
+```
+
+**Full example**: See `examples/game_of_life.rs` in ffmpeg-sidecar repository
 
 ## Real-time Whisper Transcription
 

@@ -5,6 +5,13 @@
 
 Real-time streaming, named pipes, TCP sockets, and ffplay integration.
 
+> **Dependencies**: Examples use `anyhow` for error handling:
+> ```toml
+> [dependencies]
+> ffmpeg-sidecar = "2.4.0"
+> anyhow = "1"
+> ```
+
 ## Related Guides
 
 | Guide | Content |

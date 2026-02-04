@@ -424,10 +424,12 @@ For multi-threaded processing, create separate contexts per thread or use channe
 **Common pattern**: Use ez-ffmpeg for orchestration, ffmpeg-next for specific operations within FrameFilter implementations.
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterContext};
+use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::software::scaling::{Context as ScalingContext, Flags};
 use ffmpeg_next::format::Pixel;
-use ffmpeg_next::frame::Video;
+use ffmpeg_next::Frame;
+use ffmpeg_sys_next::AVMediaType;
 
 struct FormatConverter {
     scaler: Option<ScalingContext>,
@@ -435,30 +437,39 @@ struct FormatConverter {
 }
 
 impl FrameFilter for FormatConverter {
+    fn media_type(&self) -> AVMediaType {
+        AVMediaType::AVMEDIA_TYPE_VIDEO
+    }
+
     fn filter_frame(
         &mut self,
-        frame: Video,
+        frame: Frame,
         _ctx: &FrameFilterContext,
-    ) -> Result<Option<Video>, String> {
+    ) -> Result<Option<Frame>, String> {
+        // Convert generic Frame to Video for scaling operations
+        let video_frame: ffmpeg_next::frame::Video = unsafe {
+            ffmpeg_next::frame::Video::wrap(frame.as_ptr() as *mut _)
+        };
+
         // Initialize scaler on first frame (lazy init)
         if self.scaler.is_none() {
             self.scaler = Some(ScalingContext::get(
-                frame.format(),
-                frame.width(),
-                frame.height(),
+                video_frame.format(),
+                video_frame.width(),
+                video_frame.height(),
                 self.target_format,
-                frame.width(),
-                frame.height(),
+                video_frame.width(),
+                video_frame.height(),
                 Flags::FAST_BILINEAR | Flags::BITEXACT,
             ).map_err(|e| e.to_string())?);
         }
 
-        let mut output = Video::empty();
+        let mut output = ffmpeg_next::frame::Video::empty();
         self.scaler.as_mut().unwrap()
-            .run(&frame, &mut output)
+            .run(&video_frame, &mut output)
             .map_err(|e| e.to_string())?;
 
-        Ok(Some(output))
+        Ok(Some(Frame::from(output)))
     }
 }
 ```

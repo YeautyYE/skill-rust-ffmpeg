@@ -3,7 +3,7 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.9.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.10.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
 
@@ -87,8 +87,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 The `input()` method accepts both string paths (`&str`, `String`) and `Input` objects via the `Into<Input>` trait.
 
 ```rust
-use ez_ffmpeg::{Input, AVMediaType};
+use ez_ffmpeg::Input;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ffmpeg_sys_next::AVMediaType;
 
 // Simple string input
 FfmpegContext::builder()
@@ -118,8 +119,9 @@ let input_with_pipeline = Input::from("video.mp4")
 The `output()` method accepts both string paths (`&str`, `String`) and `Output` objects via the `Into<Output>` trait.
 
 ```rust
-use ez_ffmpeg::{Output, AVRational, AVMediaType};
+use ez_ffmpeg::Output;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ffmpeg_sys_next::{AVMediaType, AVRational};
 
 // Simple string output
 FfmpegContext::builder()
@@ -139,6 +141,7 @@ let output = Output::from("output.mp4")
     .set_max_video_frames(1)              // Frame limit (thumbnails)
     .set_video_qscale(2)                  // Quality scale
     .set_framerate(AVRational { num: 30, den: 1 })  // Output framerate
+    .set_pix_fmt("yuv420p")               // Output pixel format
     .set_start_time_us(0)                 // Output start time
     .set_recording_time_us(30_000_000)    // Output recording duration
     .set_stop_time_us(30_000_000)         // Output stop time
@@ -146,6 +149,13 @@ let output = Output::from("output.mp4")
     .add_stream_map("0:a")                // Map audio stream
     .add_stream_map_with_copy("0:a")      // Copy stream without re-encode
     .add_metadata("title", "My Video");   // Output metadata
+
+// Stream disable flags (equivalent to FFmpeg's -vn, -an, -sn, -dn)
+let audio_only = Output::from("audio.mp3")
+    .disable_video();                     // Disable video, keep audio only
+
+let video_only = Output::from("video.mp4")
+    .disable_audio();                     // Disable audio, keep video only
 
 // With custom frame pipeline (see filters.md for FrameFilter implementation)
 let pipeline = FramePipelineBuilder::from(AVMediaType::AVMEDIA_TYPE_VIDEO)
@@ -215,7 +225,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.9.0", features = ["async"] }
+ez-ffmpeg = { version = "0.10.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -226,10 +236,10 @@ ez-ffmpeg = { version = "0.9.0", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.9.0", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.10.0", features = ["async", "static"] }
 
 # Build from source (last resort when system FFmpeg unavailable)
-ez-ffmpeg = { version = "0.9.0", features = ["async", "build"] }
+ez-ffmpeg = { version = "0.10.0", features = ["async", "build"] }
 ```
 
 > See [installation.md](installation.md) for detailed `build` feature usage and license options (GPL, non-free).

@@ -790,6 +790,557 @@ let keyframe_pts = find_keyframe_at("video.mp4", 10_000_000)?;
 println!("Keyframe PTS: {:?}", keyframe_pts);
 ```
 
+## ffmpeg-next EAGAIN/EOF Handling
+
+When using ffmpeg-next for decoding/encoding, you must handle EAGAIN and EOF correctly. FFmpeg codecs use a non-blocking send/receive pattern.
+
+### Decoder EAGAIN Pattern
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::{decoder, frame, Error, Packet};
+
+/// Decode packets with proper EAGAIN handling
+fn decode_packets(
+    decoder: &mut decoder::Video,
+    packet: &Packet,
+) -> Result<Vec<frame::Video>, Error> {
+    let mut frames = Vec::new();
+
+    // Send packet to decoder
+    match decoder.send_packet(packet) {
+        Ok(()) => {}
+        Err(Error::Other { errno }) if errno == ffmpeg::error::EAGAIN => {
+            // Decoder buffer full - drain first, then retry
+            drain_decoder(decoder, &mut frames)?;
+            decoder.send_packet(packet)?;
+        }
+        Err(e) => return Err(e),
+    }
+
+    // Drain available frames
+    drain_decoder(decoder, &mut frames)?;
+    Ok(frames)
+}
+
+/// Drain all available frames from decoder
+fn drain_decoder(
+    decoder: &mut decoder::Video,
+    frames: &mut Vec<frame::Video>,
+) -> Result<(), Error> {
+    let mut frame = frame::Video::empty();
+    loop {
+        match decoder.receive_frame(&mut frame) {
+            Ok(()) => {
+                frames.push(frame.clone()); // Clone - frames are reused internally
+            }
+            Err(Error::Other { errno }) if errno == ffmpeg::error::EAGAIN => {
+                // No more frames available, need more input
+                break;
+            }
+            Err(Error::Eof) => {
+                // Decoder fully flushed
+                break;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+/// Flush decoder at end of stream - CRITICAL for getting final frames
+fn flush_decoder(decoder: &mut decoder::Video) -> Result<Vec<frame::Video>, Error> {
+    let mut frames = Vec::new();
+
+    // Signal EOF to decoder
+    decoder.send_eof()?;
+
+    // Drain remaining frames (B-frames may be buffered)
+    drain_decoder(decoder, &mut frames)?;
+    Ok(frames)
+}
+```
+
+### Encoder EAGAIN Pattern
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::{encoder, frame, Error, Packet};
+
+/// Encode frames with proper EAGAIN handling
+fn encode_frame(
+    encoder: &mut encoder::Video,
+    frame: &frame::Video,
+) -> Result<Vec<Packet>, Error> {
+    let mut packets = Vec::new();
+
+    // Send frame to encoder
+    match encoder.send_frame(frame) {
+        Ok(()) => {}
+        Err(Error::Other { errno }) if errno == ffmpeg::error::EAGAIN => {
+            // Encoder buffer full - drain first, then retry
+            drain_encoder(encoder, &mut packets)?;
+            encoder.send_frame(frame)?;
+        }
+        Err(e) => return Err(e),
+    }
+
+    drain_encoder(encoder, &mut packets)?;
+    Ok(packets)
+}
+
+/// Drain all available packets from encoder
+fn drain_encoder(
+    encoder: &mut encoder::Video,
+    packets: &mut Vec<Packet>,
+) -> Result<(), Error> {
+    let mut packet = Packet::empty();
+    loop {
+        match encoder.receive_packet(&mut packet) {
+            Ok(()) => {
+                packets.push(packet.clone());
+            }
+            Err(Error::Other { errno }) if errno == ffmpeg::error::EAGAIN => {
+                break; // Need more input frames
+            }
+            Err(Error::Eof) => {
+                break; // Encoder fully flushed
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+/// Flush encoder at end - CRITICAL for getting final packets
+fn flush_encoder(encoder: &mut encoder::Video) -> Result<Vec<Packet>, Error> {
+    let mut packets = Vec::new();
+    encoder.send_eof()?;
+    drain_encoder(encoder, &mut packets)?;
+    Ok(packets)
+}
+```
+
+### Complete Transcode Loop
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::{format, codec, decoder, encoder, frame, Error};
+
+fn transcode_video(input_path: &str, output_path: &str) -> Result<(), Error> {
+    ffmpeg::init()?;
+
+    let mut ictx = format::input(input_path)?;
+    let mut octx = format::output(output_path)?;
+
+    // Setup decoder and encoder (simplified)
+    let input_stream = ictx.streams().best(ffmpeg::media::Type::Video).unwrap();
+    let mut decoder = codec::context::Context::from_parameters(input_stream.parameters())?
+        .decoder()
+        .video()?;
+
+    // ... encoder setup omitted for brevity ...
+
+    let mut frame = frame::Video::empty();
+
+    // Process all packets
+    for (stream, packet) in ictx.packets() {
+        if stream.index() == input_stream.index() {
+            decoder.send_packet(&packet)?;
+
+            // Drain all available frames
+            while decoder.receive_frame(&mut frame).is_ok() {
+                // Encode frame...
+            }
+        }
+    }
+
+    // CRITICAL: Flush decoder to get remaining frames
+    decoder.send_eof()?;
+    while decoder.receive_frame(&mut frame).is_ok() {
+        // Encode remaining frames...
+    }
+
+    // CRITICAL: Flush encoder to get remaining packets
+    // encoder.send_eof()?;
+    // while encoder.receive_packet(&mut packet).is_ok() { ... }
+
+    octx.write_trailer()?;
+    Ok(())
+}
+```
+
+**Key Points**:
+- `EAGAIN` means "try again later" - drain output first, then retry input
+- `EOF` signals end of stream - must flush to get remaining buffered data
+- Always clone frames/packets if storing them (they're reused internally)
+- Missing flush = missing final frames (especially B-frames in video)
+
+---
+
+## ffmpeg-sidecar Exit Status & Error Handling
+
+ffmpeg-sidecar runs FFmpeg as a subprocess. Proper error handling requires checking both exit status and stderr.
+
+### Exit Status Handling
+
+```rust
+use ffmpeg_sidecar::command::FfmpegCommand;
+use std::process::ExitStatus;
+
+fn run_ffmpeg_with_status(input: &str, output: &str) -> Result<(), String> {
+    let mut child = FfmpegCommand::new()
+        .input(input)
+        .output(output)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn: {}", e))?;
+
+    // Wait for completion and get exit status
+    let status: ExitStatus = child.wait()
+        .map_err(|e| format!("Wait failed: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        // Exit code interpretation:
+        // 0 = success
+        // 1 = generic error (check stderr for details)
+        // 255 = usually means FFmpeg was killed/interrupted
+        match status.code() {
+            Some(1) => Err("FFmpeg error (check logs for details)".to_string()),
+            Some(255) => Err("FFmpeg was interrupted or killed".to_string()),
+            Some(code) => Err(format!("FFmpeg exited with code: {}", code)),
+            None => Err("FFmpeg terminated by signal".to_string()),
+        }
+    }
+}
+```
+
+### Capturing stderr for Diagnostics
+
+```rust
+use ffmpeg_sidecar::command::FfmpegCommand;
+use ffmpeg_sidecar::event::FfmpegEvent;
+
+fn run_with_error_capture(input: &str, output: &str) -> Result<(), String> {
+    let mut child = FfmpegCommand::new()
+        .input(input)
+        .output(output)
+        .spawn()
+        .map_err(|e| format!("Spawn failed: {}", e))?;
+
+    let mut errors: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+
+    // Iterate through events to capture errors
+    if let Ok(iter) = child.iter() {
+        for event in iter {
+            match event {
+                FfmpegEvent::Error(msg) => {
+                    errors.push(msg);
+                }
+                FfmpegEvent::Log(level, msg) => {
+                    // FFmpeg log levels: quiet, panic, fatal, error, warning, info, verbose, debug, trace
+                    if msg.contains("error") || msg.contains("Error") {
+                        errors.push(msg);
+                    } else if msg.contains("warning") || msg.contains("Warning") {
+                        warnings.push(msg);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Check final status
+    let status = child.wait().map_err(|e| format!("Wait failed: {}", e))?;
+
+    if !warnings.is_empty() {
+        eprintln!("Warnings: {:?}", warnings);
+    }
+
+    if status.success() && errors.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "FFmpeg failed (exit: {:?}): {}",
+            status.code(),
+            errors.join("; ")
+        ))
+    }
+}
+```
+
+### Distinguishing Error Types
+
+```rust
+use ffmpeg_sidecar::command::FfmpegCommand;
+use ffmpeg_sidecar::event::FfmpegEvent;
+
+#[derive(Debug)]
+pub enum FfmpegError {
+    SpawnFailed(String),
+    InputNotFound(String),
+    CodecNotSupported(String),
+    OutputWriteFailed(String),
+    Interrupted,
+    Unknown(String),
+}
+
+fn classify_ffmpeg_error(input: &str, output: &str) -> Result<(), FfmpegError> {
+    let mut child = FfmpegCommand::new()
+        .input(input)
+        .output(output)
+        .spawn()
+        .map_err(|e| FfmpegError::SpawnFailed(e.to_string()))?;
+
+    let mut error_messages: Vec<String> = Vec::new();
+
+    if let Ok(iter) = child.iter() {
+        for event in iter {
+            if let FfmpegEvent::Error(msg) | FfmpegEvent::Log(_, msg) = event {
+                if msg.contains("No such file") || msg.contains("does not exist") {
+                    return Err(FfmpegError::InputNotFound(msg));
+                }
+                if msg.contains("Unknown encoder") || msg.contains("Encoder not found") {
+                    return Err(FfmpegError::CodecNotSupported(msg));
+                }
+                if msg.contains("Permission denied") || msg.contains("Read-only") {
+                    return Err(FfmpegError::OutputWriteFailed(msg));
+                }
+                if msg.to_lowercase().contains("error") {
+                    error_messages.push(msg);
+                }
+            }
+        }
+    }
+
+    let status = child.wait().map_err(|e| FfmpegError::Unknown(e.to_string()))?;
+
+    match status.code() {
+        Some(0) => Ok(()),
+        Some(255) => Err(FfmpegError::Interrupted),
+        _ if !error_messages.is_empty() => {
+            Err(FfmpegError::Unknown(error_messages.join("; ")))
+        }
+        _ => Err(FfmpegError::Unknown(format!("Exit code: {:?}", status.code()))),
+    }
+}
+```
+
+### Timeout with Graceful Termination
+
+```rust
+use ffmpeg_sidecar::command::FfmpegCommand;
+use std::time::{Duration, Instant};
+
+fn run_with_timeout(input: &str, output: &str, timeout_secs: u64) -> Result<(), String> {
+    let mut child = FfmpegCommand::new()
+        .input(input)
+        .output(output)
+        .spawn()
+        .map_err(|e| format!("Spawn failed: {}", e))?;
+
+    let start = Instant::now();
+    let timeout = Duration::from_secs(timeout_secs);
+
+    loop {
+        match child.inner_mut().try_wait() {
+            Ok(Some(status)) => {
+                // Process completed
+                return if status.success() {
+                    Ok(())
+                } else {
+                    Err(format!("FFmpeg failed with exit code: {:?}", status.code()))
+                };
+            }
+            Ok(None) => {
+                // Still running - check timeout
+                if start.elapsed() > timeout {
+                    // Graceful termination: send 'q' to FFmpeg
+                    if child.quit().is_err() {
+                        // Force kill if quit fails
+                        child.kill().ok();
+                    }
+                    return Err(format!("Timeout after {}s", timeout_secs));
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(e) => return Err(format!("Wait error: {}", e)),
+        }
+    }
+}
+```
+
+**Key Points**:
+- Exit code 0 = success, 1 = error, 255 = interrupted/killed
+- Always capture stderr events for detailed error messages
+- Use `child.quit()` for graceful termination (sends 'q' key)
+- Use `child.kill()` as fallback for force termination
+- Parse error messages to classify error types for better handling
+
+---
+
+## PTS/DTS Timestamp Debugging
+
+Timestamp issues are common in video processing. Here's how to debug and fix them.
+
+### Detecting Timestamp Issues
+
+```rust
+extern crate ffmpeg_next as ffmpeg;
+
+use ffmpeg::format;
+
+#[derive(Debug, Default)]
+pub struct TimestampAnalysis {
+    pub pts_gaps: Vec<(i64, i64)>,      // (expected, actual)
+    pub dts_reversals: Vec<(i64, i64)>, // (previous, current)
+    pub pts_dts_mismatches: usize,
+    pub missing_pts: usize,
+    pub missing_dts: usize,
+}
+
+pub fn analyze_timestamps(path: &str) -> Result<TimestampAnalysis, ffmpeg::Error> {
+    ffmpeg::init()?;
+    let mut ictx = format::input(path)?;
+
+    let video_stream_index = ictx
+        .streams()
+        .best(ffmpeg::media::Type::Video)
+        .map(|s| s.index());
+
+    let mut analysis = TimestampAnalysis::default();
+    let mut last_pts: Option<i64> = None;
+    let mut last_dts: Option<i64> = None;
+    let mut expected_pts_delta: Option<i64> = None;
+
+    for (stream, packet) in ictx.packets() {
+        if Some(stream.index()) != video_stream_index {
+            continue;
+        }
+
+        let pts = packet.pts();
+        let dts = packet.dts();
+
+        // Check for missing timestamps
+        if pts.is_none() {
+            analysis.missing_pts += 1;
+        }
+        if dts.is_none() {
+            analysis.missing_dts += 1;
+        }
+
+        // Check PTS gaps (irregular frame timing)
+        if let (Some(current_pts), Some(prev_pts)) = (pts, last_pts) {
+            let delta = current_pts - prev_pts;
+            if let Some(expected) = expected_pts_delta {
+                // Allow 10% tolerance
+                if (delta - expected).abs() > expected / 10 {
+                    analysis.pts_gaps.push((expected, delta));
+                }
+            } else if delta > 0 {
+                expected_pts_delta = Some(delta);
+            }
+        }
+
+        // Check DTS reversals (should never go backward)
+        if let (Some(current_dts), Some(prev_dts)) = (dts, last_dts) {
+            if current_dts < prev_dts {
+                analysis.dts_reversals.push((prev_dts, current_dts));
+            }
+        }
+
+        // Check PTS/DTS relationship (PTS should be >= DTS for video)
+        if let (Some(p), Some(d)) = (pts, dts) {
+            if p < d {
+                analysis.pts_dts_mismatches += 1;
+            }
+        }
+
+        last_pts = pts;
+        last_dts = dts;
+    }
+
+    Ok(analysis)
+}
+
+// Usage
+fn main() -> Result<(), ffmpeg::Error> {
+    let analysis = analyze_timestamps("video.mp4")?;
+
+    if !analysis.pts_gaps.is_empty() {
+        println!("PTS gaps detected: {:?}", analysis.pts_gaps.len());
+    }
+    if !analysis.dts_reversals.is_empty() {
+        println!("DTS reversals (BAD): {:?}", analysis.dts_reversals);
+    }
+    if analysis.pts_dts_mismatches > 0 {
+        println!("PTS < DTS mismatches: {}", analysis.pts_dts_mismatches);
+    }
+
+    Ok(())
+}
+```
+
+### Fixing Timestamps with Filters
+
+**Using ez-ffmpeg**:
+```rust
+use ez_ffmpeg::FfmpegContext;
+
+// Fix variable frame rate to constant
+FfmpegContext::builder()
+    .input("vfr_input.mp4")
+    .filter_desc("fps=30")  // Force constant 30fps
+    .output("cfr_output.mp4")
+    .build()?.start()?.wait()?;
+
+// Reset timestamps to start from 0
+FfmpegContext::builder()
+    .input("input.mp4")
+    .filter_desc("setpts=PTS-STARTPTS")  // Video
+    .filter_desc("asetpts=PTS-STARTPTS") // Audio
+    .output("output.mp4")
+    .build()?.start()?.wait()?;
+
+// Generate missing timestamps
+FfmpegContext::builder()
+    .input("broken.mp4")
+    .filter_desc("setpts=N/FRAME_RATE/TB")  // Regenerate from frame count
+    .output("fixed.mp4")
+    .build()?.start()?.wait()?;
+```
+
+**Using ffmpeg-sidecar**:
+```rust
+use ffmpeg_sidecar::command::FfmpegCommand;
+
+// Fix timestamps with genpts flag
+FfmpegCommand::new()
+    .args(["-fflags", "+genpts"])  // Generate missing PTS
+    .input("broken.mp4")
+    .args(["-vf", "setpts=PTS-STARTPTS"])
+    .args(["-af", "asetpts=PTS-STARTPTS"])
+    .output("fixed.mp4")
+    .spawn()?.wait()?;
+```
+
+**Common Timestamp Filters**:
+| Filter | Purpose |
+|--------|---------|
+| `fps=30` | Convert VFR to CFR |
+| `setpts=PTS-STARTPTS` | Reset video timestamps to 0 |
+| `asetpts=PTS-STARTPTS` | Reset audio timestamps to 0 |
+| `setpts=N/FRAME_RATE/TB` | Regenerate timestamps from frame count |
+| `setpts=PTS*2` | Slow down 2x (double timestamps) |
+| `setpts=PTS/2` | Speed up 2x (halve timestamps) |
+
+---
+
 ## Advanced Topics
 
 For advanced debugging scenarios, see:

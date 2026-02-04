@@ -357,7 +357,7 @@ For async operations, enable the `async` feature and use `.await`:
 > **Dependencies**:
 > ```toml
 > [dependencies]
-> ez-ffmpeg = { version = "0.9.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.10.0", features = ["async"] }
 > tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 > ```
 

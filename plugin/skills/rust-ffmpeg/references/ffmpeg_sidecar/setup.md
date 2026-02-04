@@ -5,6 +5,13 @@
 
 Installation guide, auto-download features, and platform-specific configuration for ffmpeg-sidecar.
 
+> **Dependencies**: Examples use `anyhow` for error handling:
+> ```toml
+> [dependencies]
+> ffmpeg-sidecar = "2.4.0"
+> anyhow = "1"
+> ```
+
 ## Related Guides
 
 | Guide | Content |
@@ -26,7 +33,7 @@ ffmpeg-sidecar = "2.4.0"
 
 ```toml
 [dependencies.ffmpeg-sidecar]
-version = "2.0"
+version = "2.4.0"
 features = ["download_ffmpeg", "named_pipes"]
 ```
 

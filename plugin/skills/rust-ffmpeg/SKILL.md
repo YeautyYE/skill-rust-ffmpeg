@@ -48,9 +48,12 @@ If installation constrained → Load [ffmpeg_sidecar.md](references/ffmpeg_sidec
 | "subtitles", "srt", "captions", "burn subs" | [subtitles.md](references/scenarios/subtitles.md) |
 | "AV1", "AVIF", "HDR", "10-bit", "modern codec" | [modern_codecs.md](references/scenarios/modern_codecs.md) |
 | "debug", "ffprobe", "inspect", "metadata", "error", "troubleshoot", "probe", "duration", "resolution", "corrupt", "integrity" | [debugging.md](references/scenarios/debugging.md) |
+| "filter", "effect", "scale", "crop", "overlay", "watermark", "blur", "sharpen", "color", "brightness", "rotate", "flip", "fade", "speed", "slow motion" | [filters_effects.md](references/scenarios/filters_effects.md) |
+| "image sequence", "frame extraction", "video to images", "images to video", "timelapse", "frame by frame" | [image_sequences.md](references/scenarios/image_sequences.md) |
 | "test", "validate", "verify", "golden file", "checksum", "generate test video", "testsrc" | [testing.md](references/scenarios/testing.md) |
 | "web server", "API", "S3", "async job", "integration", "tracing", "logging", "log callback", "av_log", "log redirect" | [integration.md](references/scenarios/integration.md) |
 | "gif", "animated gif", "video to gif", "gif from video", "gif loop", "gif palette" | [gif_creation.md](references/scenarios/gif_creation.md) |
+| "metadata", "chapter", "tag", "media info", "title", "artist", "album", "chapter marker" | [metadata_chapters.md](references/scenarios/metadata_chapters.md) |
 | "screen capture", "webcam", "camera capture", "record screen", "avfoundation", "directshow", "v4l2", "device capture" | [capture.md](references/scenarios/capture.md) |
 | "AVPacket", "AVFrame", "keyframe", "GOP", "NALU", "bitstream", "EAGAIN", "decode loop", "memory", "packet" | [ffmpeg_next.md](references/ffmpeg_next.md) + [ffmpeg_sys_next.md](references/ffmpeg_sys_next.md) |
 | "custom io", "io context", "AVIOContext", "read callback", "write callback" | [custom_io.md](references/ffmpeg_sys_next/custom_io.md) |
@@ -86,7 +89,7 @@ New to Rust FFmpeg? See [quick_start.md](references/quick_start.md) for 5-minute
 
 | Library | Version | FFmpeg | Rust MSRV |
 |---------|---------|--------|-----------|
-| ez-ffmpeg | 0.9.0 | 7.x | 1.70+ |
+| ez-ffmpeg | 0.10.0 | 7.x | 1.70+ |
 | ffmpeg-next | 7.1.0 | 7.x | 1.63+ |
 | ffmpeg-sys-next | 7.1.0 | 7.x | 1.63+ |
 | ffmpeg-sidecar | 2.4.0 | Any | 1.70+ |
