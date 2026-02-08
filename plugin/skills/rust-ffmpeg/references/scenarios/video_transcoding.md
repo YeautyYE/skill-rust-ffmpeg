@@ -292,7 +292,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 fn trim_fast(input_path: &str, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     FfmpegContext::builder()
         .input(Input::from(input_path)
-            .set_input_opt("ss", "00:01:00"))           // Seek BEFORE input = fast
+            .set_start_time_us(60_000_000))             // 60 seconds in microseconds
         .output(Output::from(output_path)
             .set_recording_time_us(120_000_000)          // Duration: 2 minutes (microseconds)
             .set_video_codec("copy")

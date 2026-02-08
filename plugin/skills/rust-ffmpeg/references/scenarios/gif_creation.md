@@ -97,8 +97,8 @@ FfmpegCommand::new()
 // ez-ffmpeg: GIF from 5s to 10s
 FfmpegContext::builder()
     .input(Input::from("input.mp4")
-        .set_input_opt("ss", "5")
-        .set_input_opt("t", "5"))
+        .set_start_time_us(5_000_000)
+        .set_recording_time_us(5_000_000))
     .filter_desc("fps=10,scale=480:-1:flags=lanczos")
     .output("clip.gif")
     .build()?.start()?.wait()?;

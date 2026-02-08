@@ -284,7 +284,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Trim from 10s to 30s (stream copy, fast)
 FfmpegContext::builder()
     .input(Input::from("audio.mp3")
-        .set_input_opt("ss", "00:00:10"))
+        .set_start_time_us(10_000_000))  // 10 seconds in microseconds
     .output(Output::from("trimmed.mp3")
         .set_recording_time_us(20_000_000)  // 20 seconds
         .set_audio_codec("copy"))

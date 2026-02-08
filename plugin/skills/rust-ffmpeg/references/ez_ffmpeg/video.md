@@ -65,7 +65,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Cut from 00:01:00, duration 60 seconds
 FfmpegContext::builder()
     .input(Input::from("input.mp4")
-        .set_input_opt("ss", "00:01:00"))
+        .set_start_time_us(60_000_000))  // 60 seconds in microseconds
     .output(Output::from("clip.mp4")
         .set_recording_time_us(60_000_000))  // 60 seconds
     .build()?.start()?.wait()?;
@@ -93,7 +93,7 @@ Output::from("output.mp4")
 // Stream copy (fast, no re-encoding)
 FfmpegContext::builder()
     .input(Input::from("input.mp4")
-        .set_input_opt("ss", "00:01:00"))
+        .set_start_time_us(60_000_000))  // 60 seconds in microseconds
     .output(Output::from("clip.mp4")
         .set_recording_time_us(60_000_000)  // 60 seconds
         .add_stream_map_with_copy("0:v")
@@ -206,7 +206,7 @@ FfmpegContext::builder()
 // Frame at specific time
 FfmpegContext::builder()
     .input(Input::from("video.mp4")
-        .set_input_opt("ss", "00:00:10"))
+        .set_start_time_us(10_000_000))  // 10 seconds in microseconds
     .output(Output::from("thumb_10s.jpg")
         .set_max_video_frames(1))
     .build()?.start()?.wait()?;

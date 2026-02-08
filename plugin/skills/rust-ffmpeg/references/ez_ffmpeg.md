@@ -99,7 +99,6 @@ FfmpegContext::builder()
 // Configured Input object
 let input = Input::from("video.mp4")
     .set_format("mp4")                    // Force format
-    .set_input_opt("ss", "00:01:00")      // Seek to time
     .set_start_time_us(60_000_000)        // Start time in microseconds
     .set_recording_time_us(30_000_000)    // Recording duration in microseconds
     .set_stop_time_us(90_000_000)         // Stop time in microseconds
