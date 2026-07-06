@@ -12,6 +12,7 @@ Rust FFmpeg development is hard — 4 competing libraries, each with different A
 - **Select the right library** — 3-layer decision framework routes to the optimal library based on your requirements (async? frame-level? no install?)
 - **Generate production-ready code** — Not toy examples. Proper error handling, `Result<>` returns, async patterns, hardware acceleration
 - **Cover 15+ scenarios** — Transcoding, streaming, capture, GIF creation, batch processing, subtitles, modern codecs, debugging, and more
+- **Latest library capabilities** — GPU custom shaders (wgpu/WGSL), native subtitle burn-in (no libass), typed detection/measurement (black/silence/scene/EBU R128), one-shot recipes (thumbnail/sprite sheet/HLS ladder), and FFmpeg 7–8 support
 - **Support all 4 libraries** — Same task shown across ez-ffmpeg, ffmpeg-next, ffmpeg-sys-next, and ffmpeg-sidecar with trade-off comparison
 
 ## Supported Libraries
@@ -54,7 +55,7 @@ Claude will automatically select the optimal library, load relevant references, 
 
 ## What's Inside
 
-50 reference documents (~54K words) organized as:
+53 reference documents organized as:
 
 - **Scenario guides** — Video transcoding, audio extraction, streaming, hardware acceleration, batch processing, subtitles, modern codecs, GIF creation, device capture, debugging, testing, integration
 - **Library-specific guides** — Detailed API docs for each library with video, audio, streaming, filters, and advanced topics
@@ -66,7 +67,7 @@ Claude will automatically select the optimal library, load relevant references, 
 plugin/skills/rust-ffmpeg/
 ├── SKILL.md              # Decision framework + routing logic
 └── references/
-    ├── scenarios/        # 13 cross-library scenario guides
+    ├── scenarios/        # 16 cross-library scenario guides
     ├── ez_ffmpeg/        # 8 library-specific guides
     ├── ffmpeg_next/      # 8 library-specific guides
     ├── ffmpeg_sidecar/   # 9 library-specific guides

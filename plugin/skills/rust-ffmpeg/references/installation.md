@@ -33,7 +33,7 @@ Comprehensive platform-specific installation for FFmpeg library development in R
 | **macOS** | `brew install ffmpeg` | Dynamic |
 | **Ubuntu/Debian** | `sudo apt install libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libavdevice-dev libswscale-dev libswresample-dev pkg-config clang` | Dynamic |
 | **Windows** | `vcpkg install ffmpeg:x64-windows-static-md` + set `VCPKG_ROOT` env | Static |
-| **Any (fallback)** | `features = ["build"]` in Cargo.toml | Static (from source) |
+| **Any (fallback)** | `ffmpeg-sys-next`/`ffmpeg-next` with `features = ["build"]` (ez-ffmpeg has no `build` feature) | Static (from source) |
 
 ## Installation Priority
 
@@ -49,7 +49,7 @@ Comprehensive platform-specific installation for FFmpeg library development in R
 brew install ffmpeg
 
 # Verify
-pkg-config --modversion libavcodec  # Should show 61.x for FFmpeg 7.x
+pkg-config --modversion libavcodec  # 61.x for FFmpeg 7, 62.x for FFmpeg 8
 ```
 
 ### MacPorts (Alternative)
@@ -169,9 +169,9 @@ $env:VCPKGRS_DYNAMIC = "0"  # Force static linking
 **Cargo.toml**:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.10.0", features = ["static"] }
+ez-ffmpeg = { version = "0.12.0", features = ["static"] }
 # OR
-ffmpeg-next = { version = "7.1.0", features = ["static"] }
+ffmpeg-next = { version = "8.1.0", features = ["static"] }
 ```
 
 ### MSYS2 (Alternative - Dynamic)
@@ -224,7 +224,7 @@ panic = "abort"
 ### Debian Dockerfile
 
 ```dockerfile
-FROM rust:1.75-slim
+FROM rust:1.80-slim
 RUN apt-get update && apt-get install -y \
     libavcodec-dev libavformat-dev libavutil-dev \
     libavfilter-dev libswscale-dev pkg-config clang \
@@ -237,7 +237,7 @@ RUN cargo build --release
 ### Alpine Dockerfile (Smaller)
 
 ```dockerfile
-FROM rust:1.75-alpine
+FROM rust:1.80-alpine
 RUN apk add --no-cache ffmpeg-dev pkgconfig clang musl-dev
 WORKDIR /app
 COPY . .
@@ -282,16 +282,16 @@ jobs:
 
 ```bash
 # Check FFmpeg version
-ffmpeg -version  # Should show 7.x
+ffmpeg -version  # Should show 7.x or 8.x
 
-# Check library versions
-pkg-config --modversion libavcodec   # 61.x for FFmpeg 7.x
-pkg-config --modversion libavformat  # 61.x
-pkg-config --modversion libavutil    # 59.x
+# Check library versions (ez-ffmpeg 0.12 supports both majors)
+pkg-config --modversion libavcodec   # 61.x for FFmpeg 7 / 62.x for FFmpeg 8
+pkg-config --modversion libavformat  # 61.x / 62.x
+pkg-config --modversion libavutil    # 59.x / 60.x
 
 # Test build
 cargo new --bin ffmpeg_test && cd ffmpeg_test
-echo 'ez-ffmpeg = "0.10.0"' >> Cargo.toml
+echo 'ez-ffmpeg = "0.12.0"' >> Cargo.toml
 cargo build --release
 ```
 
@@ -307,7 +307,7 @@ vcpkg integrate install
 # Test build (pkg-config/ffmpeg CLI may not be available)
 cargo new --bin ffmpeg_test
 cd ffmpeg_test
-Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.10.0", features = ["static"] }'
+Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.12.0", features = ["static"] }'
 cargo build --release
 ```
 
@@ -319,10 +319,12 @@ cargo build --release
 
 | Library | Version | FFmpeg Required | libavcodec Version |
 |---------|---------|-----------------|-------------------|
-| ez-ffmpeg | 0.10.0 | 7.x | 61.x |
-| ffmpeg-next | 7.x | 7.x | 61.x |
-| ffmpeg-next | 6.x | 6.x | 60.x |
-| ffmpeg-next | 5.x | 5.x | 59.x |
+| ez-ffmpeg | 0.12.0 | 7.0 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
+| ffmpeg-next / -sys-next | 8.1.0 (current) | 7.0 – 8.x | 61.x / 62.x (auto-detected) |
+| ffmpeg-next / -sys-next | 7.1.x (legacy) | 4.x – 7.1 | ≤ 61.x |
+| ffmpeg-next / -sys-next | 6.x (legacy) | ≤ 6.x | ≤ 60.x |
+
+> The crate builds bindings from the **installed** FFmpeg headers, so the current `8.1.0` line compiles against FFmpeg 7 **and** 8 — you do not downgrade the crate to match an FFmpeg-7 system. Older crate lines are listed only for pre-FFmpeg-8 toolchains.
 
 ---
 
@@ -334,14 +336,15 @@ When system FFmpeg installation is impossible (restricted environments, no admin
 
 ```toml
 [dependencies]
-# ffmpeg-next
-ffmpeg-next = { version = "7.1.0", features = ["build"] }
+# ffmpeg-next / ffmpeg-sys-next expose the `build` feature directly
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
 
-# ez-ffmpeg (inherits build capability)
-ez-ffmpeg = { version = "0.10.0", features = ["build"] }
+# ez-ffmpeg has NO `build` feature — enable source build via the sys crate:
+ez-ffmpeg = { version = "0.12.0" }
+ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 
 # With GPL codecs (x264, x265)
-ffmpeg-next = { version = "7.1.0", features = ["build", "build-license-gpl"] }
+ffmpeg-next = { version = "8.1.0", features = ["build", "build-license-gpl"] }
 ```
 
 ### Requirements

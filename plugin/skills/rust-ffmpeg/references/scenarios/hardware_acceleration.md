@@ -1,6 +1,6 @@
 # Hardware Acceleration
 
-**Detection Keywords**: gpu encoding, hardware acceleration, how to use gpu for video, speed up video encoding, nvenc, videotoolbox, vaapi, quicksync, cuda, hardware decode, d3d12va, amf, vulkan, cuvid, mf, media foundation
+**Detection Keywords**: gpu encoding, hardware acceleration, how to use gpu for video, speed up video encoding, nvenc, videotoolbox, vaapi, quicksync, cuda, hardware decode, d3d12va, amf, vulkan, cuvid, mf, media foundation, gpu filter, scale_cuda, scale_vaapi, libplacebo, zero-copy filter, wgpu, custom gpu shader
 **Aliases**: hwaccel, GPU encode, hardware encoder, NVENC, QSV, VideoToolbox, VAAPI
 
 Use GPU and hardware encoders for faster video processing across all Rust FFmpeg libraries.
@@ -11,6 +11,8 @@ Use GPU and hardware encoders for faster video processing across all Rust FFmpeg
 - [Platform Support Matrix](#platform-support-matrix)
 - [Runtime Availability Detection](#runtime-availability-detection)
 - [Platform-Specific Examples](#platform-specific-examples)
+- [GPU Filter-Backend Probing](#gpu-filter-backend-probing)
+- [Custom GPU Shaders (wgpu)](#custom-gpu-shaders-wgpu)
 - [ffmpeg-next Hardware Transcoding](#ffmpeg-next-hardware-transcoding)
 - [ffmpeg-sidecar Hardware Encoding](#ffmpeg-sidecar-hardware-encoding)
 - [Decoder + Encoder Pipeline](#decoder--encoder-pipeline)
@@ -22,13 +24,13 @@ Use GPU and hardware encoders for faster video processing across all Rust FFmpeg
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg
-> ez-ffmpeg = "0.10.0"
+> ez-ffmpeg = "0.12.0"
 >
 > # For ffmpeg-next
-> ffmpeg-next = "7.1.0"
+> ffmpeg-next = "8.1.0"
 >
 > # For ffmpeg-sidecar
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > ```
 
 ## Quick Example (30 seconds)
@@ -303,6 +305,87 @@ fn transcode_with_best_hwaccel(
     Ok(())
 }
 ```
+
+## GPU Filter-Backend Probing
+
+Hardware *filters* (unlike encoders) depend on both the linked FFmpeg build and a
+usable GPU device at runtime. The `ffmpeg` binary in `PATH` and the `libav*` your
+program links are often different builds — so probe the linked build with
+`get_gpu_filter_backends()` instead of trusting `ffmpeg -filters` output.
+
+**No feature flag required** — this lives in `ez_ffmpeg::hwaccel` (default build).
+
+```rust
+use ez_ffmpeg::hwaccel::{get_gpu_filter_backends, GpuFilterBackend};
+
+let backends = get_gpu_filter_backends();
+
+// A backend+filter is usable only if the device is creatable on THIS machine
+// AND the filter was compiled into the linked build.
+let usable = |backend_name: &str, filter: &str| {
+    backends.iter().any(|b| {
+        b.name == backend_name
+            && b.device_available
+            && b.filters.iter().any(|f| f.name == filter && f.present_in_build)
+    })
+};
+
+// e.g. usable("cuda", "scale_cuda") / usable("vaapi", "scale_vaapi") / usable("vulkan", "libplacebo")
+for b in &backends {
+    println!("{}: device_available={}", b.name, b.device_available);
+}
+```
+
+`GpuFilterBackend` fields: `name: String`, `device_available: bool`,
+`device_error: Option<..>`, `filters: Vec<GpuFilterAvailability>` (each with
+`name: &str` + `present_in_build: bool`). For a single filter,
+`is_filter_available(name)` is a shortcut.
+
+**Zero-copy GPU filter chain** — keep decoded frames in VRAM through the filter
+and encoder (no system-memory round trip). NVIDIA example:
+```rust
+use ez_ffmpeg::{FfmpegContext, Input, Output};
+
+let input = Input::from("input.mp4")
+    .set_hwaccel("cuda")
+    .set_hwaccel_output_format("cuda");   // keep frames on the GPU
+
+let output = Output::from("output.mp4")
+    .set_video_codec("h264_nvenc")
+    .set_audio_codec("aac");
+
+FfmpegContext::builder()
+    .input(input)
+    .filter_desc("scale_cuda=640:360")     // GPU scaler, frames stay in VRAM
+    .output(output)
+    .build()?.start()?.wait()?;
+```
+
+Swap the leg for other vendors once probed usable:
+
+| Backend | hwaccel / output format | GPU scale filter | Encoder |
+|---------|-------------------------|------------------|---------|
+| CUDA (NVIDIA) | `cuda` / `cuda` | `scale_cuda=640:360` | `h264_nvenc` |
+| VAAPI (Intel/AMD Linux) | `vaapi` / `vaapi` | `scale_vaapi=w=640:h=360` | `h264_vaapi` |
+| QSV (Intel) | `qsv` / `qsv` | `vpp_qsv=w=640:h=360` | `h264_qsv` |
+| libplacebo (Vulkan) | software decode | `libplacebo=w=640:h=360:format=yuv420p` | `libx264` |
+
+libplacebo accepts software frames and uploads them to its Vulkan device
+internally; the probe cannot tell a real GPU from software Vulkan (e.g. lavapipe),
+so a selected Vulkan chain can still run at CPU speed. The decode side is also
+runtime-dependent (e.g. NVDEC must support the input codec), so a probed-usable
+hardware chain can still fail on exotic inputs — keep a CPU `scale=640:360` +
+`libx264` fallback.
+
+## Custom GPU Shaders (wgpu)
+
+For a *custom* per-frame effect (not a built-in scaler), write a WGSL fragment
+shader and run it with `WgpuFrameFilter` (`features = ["wgpu"]`). It is headless
+(no X11/Wayland), does GPU-side YUV↔RGB conversion, and supports output resize,
+live parameters, and per-stage timing. This replaces the deprecated OpenGL filter.
+
+See [ez_ffmpeg/filters.md — GPU Custom Filters (wgpu)](../ez_ffmpeg/filters.md#gpu-custom-filters-wgpu)
+for the full example and the WGSL shader contract.
 
 ## ffmpeg-next Software Transcoding (x264)
 

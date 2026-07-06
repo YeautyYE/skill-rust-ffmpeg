@@ -309,9 +309,11 @@ FfmpegContext::builder()
     .output(Output::from("output.wav")
         .set_audio_sample_rate(48000)
         .set_audio_channels(2)
-        .set_audio_sample_fmt("s16"))
+        .set_audio_sample_fmt(ffmpeg_sys_next::AVSampleFormat::AV_SAMPLE_FMT_S16))
     .build()?.start()?.wait()?;
 ```
+
+> `set_audio_sample_fmt` takes the `AVSampleFormat` enum (not a string). It is defined in `ffmpeg-sys-next` — add that crate at the same version as ez-ffmpeg's (`ffmpeg-sys-next = "8.1.0"`) to name the variant, or omit the call to let the encoder pick a supported format.
 
 ### High-Quality x264 Encoding
 
@@ -437,7 +439,7 @@ ffmpeg -i input.mp4 -map_metadata 0 -c copy output.mp4
 FfmpegContext::builder()
     .input("input.mp4")
     .output(Output::from("output.mp4")
-        .map_metadata_from_input(0)
+        .map_metadata_from_input(0, "g", "g").unwrap()  // returns Result; (input_index, src_spec, dst_spec)
         .add_stream_map_with_copy("0:v")
         .add_stream_map_with_copy("0:a"))
     .build()?.start()?.wait()?;
@@ -494,8 +496,8 @@ FfmpegContext::builder()
 | `-r fps` | `.set_framerate(AVRational{num,den})` | Output frame rate |
 | `-ar rate` | `.set_audio_sample_rate(rate)` | Audio sample rate (Hz) |
 | `-ac channels` | `.set_audio_channels(channels)` | Audio channel count |
-| `-sample_fmt fmt` | `.set_audio_sample_fmt("fmt")` | Audio sample format |
-| `-vsync method` | `.set_vsync_method("method")` | Video sync method |
+| `-sample_fmt fmt` | `.set_audio_sample_fmt(AVSampleFormat::AV_SAMPLE_FMT_S16)` | Audio sample format (enum, from `ffmpeg-sys-next`) |
+| `-vsync method` | `.set_vsync_method(VSyncMethod::VsyncCfr)` | Video sync (`VSyncMethod` from `ez_ffmpeg::core::context::output`) |
 | `-bits_per_raw_sample n` | `.set_bits_per_raw_sample(n)` | Bits per raw sample |
 
 ### Quality & Frame Limits
@@ -526,7 +528,7 @@ FfmpegContext::builder()
 | `-metadata:s:v:0 k=v` | `.add_stream_metadata("v:0", "k", "v")` | Stream metadata |
 | `-metadata:c:0 k=v` | `.add_chapter_metadata(0, "k", "v")` | Chapter metadata |
 | `-metadata:p:0 k=v` | `.add_program_metadata(0, "k", "v")` | Program metadata |
-| `-map_metadata input` | `.map_metadata_from_input(input)` | Copy metadata from input |
+| `-map_metadata input` | `.map_metadata_from_input(input, "g", "g")?` | Copy metadata (3 args, returns `Result`) |
 | `-map_metadata -1` | `.disable_auto_copy_metadata()` | Disable metadata copy |
 
 ### Filters

@@ -370,7 +370,7 @@ FfmpegContext::builder()
 FfmpegContext::builder()
     .input("input.mp4")
     .output(Output::from("output.mp4")
-        .map_metadata_from_input(0)  // Copy all metadata from input 0
+        .map_metadata_from_input(0, "g", "g").unwrap()  // Copy global metadata from input 0 (returns Result)
         .set_video_codec("libx264"))
     .build()?.start()?.wait()?;
 

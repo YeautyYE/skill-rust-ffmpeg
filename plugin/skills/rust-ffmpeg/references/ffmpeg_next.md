@@ -5,8 +5,8 @@
 
 **Crate**: https://crates.io/crates/ffmpeg-next
 **Documentation**: https://docs.rs/ffmpeg-next
-**Version**: 7.x (tracks FFmpeg major versions)
-**FFmpeg Compatibility**: 7.x (libavcodec 61.x)
+**Version**: 8.1.0 (current)
+**FFmpeg Compatibility**: builds against FFmpeg **7.0 – 8.x** — bindings are generated from the installed headers (bindgen) with compile-time `ffmpeg_7_x`/`ffmpeg_8_x` cfgs, so 8.1.0 compiles on both libavcodec 61 (FFmpeg 7) and 62 (FFmpeg 8). No need to downgrade the crate for FFmpeg 7.
 
 ## Related Guides
 
@@ -56,19 +56,37 @@
 
 ```toml
 [dependencies]
-ffmpeg-next = "7.1.0"
+ffmpeg-next = "8.1.0"
 ```
 
 **Feature options**:
 ```toml
 # Static linking (bundles pre-built FFmpeg libraries)
-ffmpeg-next = { version = "7.1.0", features = ["static"] }
+ffmpeg-next = { version = "8.1.0", features = ["static"] }
 
 # Build from source (last resort when system FFmpeg unavailable)
-ffmpeg-next = { version = "7.1.0", features = ["build"] }
+ffmpeg-next = { version = "8.1.0", features = ["build"] }
 ```
 
 > **Feature hierarchy**: `build` includes `static`. The `static` feature links against pre-built libraries; `build` compiles FFmpeg from source. See [installation.md](installation.md) for detailed `build` feature usage and license options.
+
+## FFmpeg 8 Additions (8.0/8.1)
+
+Three additions worth knowing when targeting 8.x:
+
+- **Safe stream I/O** — no more raw `AVIOContext` for common custom sources. `format::context::StreamIo` wraps any Rust `Read`/`Write` (+ optional `Seek`) `+ Send`; build a context with `format::input_from_stream(io, filename, opts)` or `format::output_to_stream(io, filename, format)`:
+  ```rust
+  use ffmpeg_next::format::{self, context::StreamIo};
+  use std::io::Cursor;
+
+  let bytes = std::fs::read("input.mp4")?;                       // any Read + Seek + Send
+  let io = StreamIo::from_read_seek(Cursor::new(bytes))?;
+  let mut ictx = format::input_from_stream(io, Some("input.mp4"), None)?;
+  // write side: StreamIo::from_write_seek(..) + format::output_to_stream(..)
+  ```
+  Constructors: `from_read` / `from_read_seek` / `from_write` / `from_write_seek` (+ `_with_capacity` variants); recover the stream with `into_inner::<T>()`. For a writable stream, call `write_trailer` before drop.
+- **Corruption check** — `frame.has_decode_errors() -> bool` (wraps `decode_error_flags`) flags frames the decoder recovered with errors; useful for integrity/QC of damaged inputs.
+- **Interruptible open** — `format::input_with_interrupt(path, || should_abort)` takes an `FnMut() -> bool` callback FFmpeg polls, so a hung network/open can be cancelled (timeout/watchdog).
 
 ## Overview
 

@@ -17,12 +17,12 @@ Process multiple media files concurrently using async/parallel execution.
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.10.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.12.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > futures = "0.3"
 >
 > # For ffmpeg-sidecar (thread-based)
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > rayon = "1.10"  # Optional: for parallel iterator processing
 > ```
 

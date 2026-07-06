@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 **Installation** (sync):
 ```toml
 [dependencies]
-ez-ffmpeg = "0.10.0"
+ez-ffmpeg = "0.12.0"
 ```
 
 **Async version** (requires `async` feature):
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 **Installation** (async):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.10.0", features = ["async"] }
+ez-ffmpeg = { version = "0.12.0", features = ["async"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -91,7 +91,7 @@ fn main() -> Result<(), ffmpeg::Error> {
 **Installation**:
 ```toml
 [dependencies]
-ffmpeg-next = "7.1.0"
+ffmpeg-next = "8.1.0"
 ```
 
 **Important**: ffmpeg-next requires explicit decode/encode loops for transcoding. The example above shows input inspection only. For complete transcoding with frame processing, see [ffmpeg_next/transcoding.md](ffmpeg_next/transcoding.md).
@@ -135,7 +135,7 @@ fn main() {
 **Installation**:
 ```toml
 [dependencies]
-ffmpeg-sys-next = "7.1.0"
+ffmpeg-sys-next = "8.1.0"
 ```
 
 **Next steps**: [ffmpeg_sys_next.md](ffmpeg_sys_next.md)
@@ -165,7 +165,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 **Installation**:
 ```toml
 [dependencies]
-ffmpeg-sidecar = "2.4.0"
+ffmpeg-sidecar = "2.5.2"
 ```
 
 **Next steps**: [ffmpeg_sidecar.md](ffmpeg_sidecar.md)

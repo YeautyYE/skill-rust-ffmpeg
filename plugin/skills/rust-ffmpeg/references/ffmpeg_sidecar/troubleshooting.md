@@ -8,7 +8,7 @@ Error handling, common issues, best practices, and performance optimization.
 > **Dependencies**: Examples use `anyhow` for error handling:
 > ```toml
 > [dependencies]
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > anyhow = "1"
 > ```
 

@@ -318,7 +318,7 @@ unsafe fn read_packets(
 
 **Linker errors (undefined reference to av_*)**:
 - FFmpeg development libraries not installed
-- Wrong FFmpeg version (requires FFmpeg 7.x)
+- Unsupported FFmpeg version (8.1.0 builds against FFmpeg 7.0–8.x via bindgen + version-gated cfgs; a much older or newer FFmpeg than the crate supports will fail)
 - Set `PKG_CONFIG_PATH` correctly for FFmpeg location
 
 **Segfaults in unsafe code**:

@@ -30,6 +30,10 @@ Internal reference for maintaining consistent Detection Keywords across the skil
 | ez_ffmpeg.md | high-level API, simple transcoding, builder pattern, rust ffmpeg easy | ez-ffmpeg, ezffmpeg |
 | video_transcoding.md | transcode video, convert format, change container, video to mp4 | convert, basic |
 | filters.md | video filter, audio filter, scale, crop, overlay, drawtext | filter chain, vf, af |
+| ez_ffmpeg/filters.md + scenarios/hardware_acceleration.md | GPU custom filter, WGSL shader, WgpuFrameFilter, headless GPU | wgpu, compute shader |
+| scenarios/subtitles.md | native subtitle burn-in, SubtitleFilter, pure-Rust subtitle, no libass | hardsub, force_style |
+| scenarios/debugging.md + scenarios/audio_extraction.md | detection, measurement, blackdetect, silencedetect, EBU R128, Analysis runner | QC, loudness measure |
+| scenarios/image_sequences.md + gif_creation.md + streaming_rtmp_hls.md | thumbnail, sprite sheet, animated gif, HLS ABR ladder, one-shot recipe | HlsLadder, storyboard |
 | streaming_rtmp_hls.md | RTMP output, HLS output, live streaming output | stream to, broadcast |
 | frame_filter.md | custom filter, frame processing, pixel manipulation, rust callback | FrameFilter trait |
 | async_processing.md | async ffmpeg, tokio integration, non-blocking, concurrent | async, await |
@@ -76,9 +80,12 @@ Internal reference for maintaining consistent Detection Keywords across the skil
 | audio_extraction.md | first frame, thumbnail, audio extract, metadata read | poster, preview |
 | transcoding.md | multi-output, concat videos, watermark, decode-encode | merge, join, overlay |
 | streaming_rtmp_hls.md | real-time, RTMP, HLS, TCP socket, screen capture | live, broadcast, capture |
-| hardware_acceleration.md | hardware acceleration, GPU encoding, progress monitor | nvenc, videotoolbox |
+| hardware_acceleration.md | hardware acceleration, GPU encoding, progress monitor, GPU filter backend, custom shader, wgpu, WGSL, libplacebo | nvenc, videotoolbox |
 | batch_processing.md | batch processing, multiple files, bulk convert, parallel encode | bulk, multi-file |
-| subtitles.md | subtitles, srt, ass, vtt, burn subtitles, embed subtitles | captions, subs |
+| subtitles.md | subtitles, srt, ass, vtt, burn subtitles, embed subtitles, native burn-in, without libass | captions, subs |
+| debugging.md | detect black frames, silence detect, scene detect, cropdetect, EBU R128, LUFS, measure loudness, content analysis, QC | blackdetect, silencedetect |
+| gif_creation.md | animated gif, gif recipe, palettegen, gif loop, gif dither | gif, video to gif |
+| image_sequences.md | thumbnail recipe, sprite sheet, storyboard, contact sheet, frame extraction | thumbnails, tiles |
 
 ## Validation Rules
 

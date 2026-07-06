@@ -270,6 +270,40 @@ let filter_spec = "loudnorm=I=-16:TP=-1.5:LRA=11";
 | `-24 LUFS` | -24 | -2.0 dBTP | TV broadcast (EBU R128) |
 | `-24 LKFS` | -24 | -2.0 dBTP | US broadcast (ATSC A/85) |
 
+### EBU R128 Loudness Measurement
+
+The `loudnorm` filter above **changes** the audio to hit a target. To only
+**measure** loudness as typed Rust data (without modifying the file), use the
+`analysis` module's `Ebur128` detector — **no feature flag required** (default build).
+
+```rust
+use ez_ffmpeg::analysis::{Analysis, AudioDetector};
+
+fn measure_loudness(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let report = Analysis::new(path)
+        .audio_detector(AudioDetector::Ebur128 { true_peak: true })
+        .run()?;
+
+    if let Some(loudness) = report.loudness {
+        println!("integrated: {:?} LUFS", loudness.integrated); // program loudness
+        println!("LRA       : {:?} LU",   loudness.lra);        // loudness range
+        println!("true peak : {:?} dBTP", loudness.true_peak);  // None if true_peak: false
+    }
+    Ok(())
+}
+```
+
+`report.loudness` is an `Option<LoudnessReport>` with fields `integrated: Option<f64>`,
+`lra: Option<f64>`, and `true_peak: Option<f64>`. Typical flow: measure first, then
+apply the `loudnorm` filter to reach the target you picked. See
+[debugging.md — Detection & Measurement](debugging.md#detection--measurement-typed)
+for the other detectors (black/scene/silence/crop).
+
+| Goal | Use | Result |
+|------|-----|--------|
+| Read current LUFS / true-peak / LRA | `AudioDetector::Ebur128` (analysis) | Typed `LoudnessReport`, file unchanged |
+| Change audio to a target LUFS | `loudnorm` filter (above) | New normalized output file |
+
 ## Related Scenarios
 
 | Scenario | Guide |

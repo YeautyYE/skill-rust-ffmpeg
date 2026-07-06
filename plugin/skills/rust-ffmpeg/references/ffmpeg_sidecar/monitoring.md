@@ -8,7 +8,7 @@ Progress tracking, metadata extraction, ffprobe integration, and logging.
 > **Dependencies**: Examples use `anyhow` for error handling:
 > ```toml
 > [dependencies]
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > anyhow = "1"
 > ```
 
@@ -66,8 +66,15 @@ fn collect_metadata(input: &str) -> anyhow::Result<()> {
     println!("Output streams: {}", metadata.output_streams.len());
 
     for stream in &metadata.input_streams {
-        println!("Stream {}: {} ({})",
-                 stream.index, stream.codec_type, stream.codec_name);
+        if let Some(v) = stream.video_data() {
+            println!("Stream {}: video {} {}x{} @ {}fps",
+                     stream.stream_index, v.pix_fmt, v.width, v.height, v.fps);
+        } else if let Some(a) = stream.audio_data() {
+            println!("Stream {}: audio {} Hz, {} channels",
+                     stream.stream_index, a.sample_rate, a.channels);
+        } else {
+            println!("Stream {}: {}", stream.stream_index, stream.format);
+        }
     }
 
     Ok(())

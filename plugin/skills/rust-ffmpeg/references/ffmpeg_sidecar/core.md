@@ -145,7 +145,7 @@ cmd.map("0:2");                      // -map 0:2 (first input, stream index 2)
 // Disable streams
 cmd.no_video();                      // -vn (no video)
 cmd.no_audio();                      // -an (no audio)
-cmd.no_subtitle();                   // -sn (no subtitles)
+cmd.args(["-sn"]);                   // -sn (no subtitles) — no dedicated no_subtitle() helper
 ```
 
 ### Filters
@@ -480,11 +480,17 @@ pub enum LogLevel {
 
 ```rust
 pub struct Stream {
-    pub index: u32,
-    pub codec_type: String,  // "video", "audio", "subtitle"
-    pub codec_name: String,  // "h264", "aac", etc.
-    // Additional fields...
+    pub format: String,        // e.g. "h264", "aac", "srt" (the -f/codec token)
+    pub language: String,      // e.g. "eng"
+    pub parent_index: u32,     // which input/output this stream belongs to
+    pub stream_index: u32,     // index of the stream within the input
+    pub raw_log_message: String,
+    pub type_specific_data: StreamTypeSpecificData,  // Video/Audio/Subtitle/Other
 }
+// Query the stream type via methods, not fields:
+//   stream.is_video() / is_audio() / is_subtitle()
+//   stream.video_data() -> Option<&VideoStream> { pix_fmt, width, height, fps }
+//   stream.audio_data() -> Option<&AudioStream> { sample_rate, channels }
 ```
 
 ### FfmpegMetadata

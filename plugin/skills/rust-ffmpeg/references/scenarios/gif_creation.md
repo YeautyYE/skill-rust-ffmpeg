@@ -8,14 +8,19 @@ Create high-quality animated GIFs from video across all Rust FFmpeg libraries.
 ## Quick Example (30 seconds)
 
 ```rust
-// ez-ffmpeg — basic GIF
-use ez_ffmpeg::{FfmpegContext, Output};
+// ez-ffmpeg — one-shot recipe (preferred; no feature flag, default build)
+// animated_gif builds the palettegen/paletteuse graph for you in a single call.
+use ez_ffmpeg::recipes::{animated_gif, GifOptions};
 
-FfmpegContext::builder()
-    .input("input.mp4")
-    .filter_desc("fps=10,scale=320:-1:flags=lanczos")
-    .output("output.gif")
-    .build()?.start()?.wait()?;
+animated_gif(
+    "input.mp4",
+    "output.gif",
+    GifOptions {
+        fps: 12,
+        width: Some(480),
+        ..GifOptions::default()
+    },
+)?;
 ```
 
 ```rust
@@ -29,7 +34,38 @@ FfmpegCommand::new()
     .spawn()?.wait()?;
 ```
 
+## GIF Recipe Options (ez-ffmpeg)
+
+`animated_gif` covers trimming, dithering, palette size, and looping through `GifOptions` — no manual filter string needed, and **no feature flag** (default build).
+
+```rust
+use ez_ffmpeg::recipes::{animated_gif, GifOptions, GifTrim, Dither, GifLoop};
+
+// A 3-second, 480px-wide clip starting at 5s, capped at 128 colours, played 3 times.
+animated_gif(
+    "input.mp4",
+    "clip.gif",
+    GifOptions {
+        fps: 15,
+        width: Some(480),
+        trim: Some(GifTrim::from_micros(5_000_000, 3_000_000)), // input-side trim
+        dither: Dither::Bayer { scale: 3 },
+        max_colors: Some(128),
+        loop_: GifLoop::Count(3),
+        ..GifOptions::default()
+    },
+)?;
+```
+
+- **`trim: Option<GifTrim>`** — trim applied on the **input** side (input seek + recording time), so the palette is built from exactly the chosen segment rather than the whole clip. Construct with `GifTrim::from_micros(start_us, duration_us)` or `GifTrim::from_durations(start, duration)` (from `std::time::Duration`).
+- **`dither: Dither`** — `None`, `Bayer { scale }` (`scale` in `0..=5`), `Sierra2` (default), or `FloydSteinberg`.
+- **`max_colors: Option<u32>`** — palette size, `4..=256`; `None` uses FFmpeg's default of 256.
+- **`loop_: GifLoop`** — `Infinite` (default, `loop=0`), `Count(n)` (`n` in `1..=65535`), or `Once` (play once, `loop=-1`).
+- **`fps` / `width`** — `width: None` keeps the source width; height is auto-derived to preserve aspect ratio.
+
 ## High-Quality GIF (Two-Pass with Palette)
+
+*Advanced / custom fallback.* For ez-ffmpeg, prefer `animated_gif` above — it builds this optimized palette internally in a single call and adds trim/dither/loop control. Hand-roll the two-pass below only when you need a custom filter chain or an externally-supplied palette, or when using ffmpeg-sidecar / ffmpeg-next (which have no recipe).
 
 Single-pass GIF uses a global 256-color palette → banding artifacts. Two-pass generates an optimized palette first → significantly better quality.
 

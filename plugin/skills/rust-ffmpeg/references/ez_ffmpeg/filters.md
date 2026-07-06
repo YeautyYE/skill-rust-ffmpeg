@@ -1,6 +1,6 @@
 # ez-ffmpeg: Filters
 
-**Detection Keywords**: video filter, scale, crop, overlay, filter chain, custom filter, frame filter, opengl filter
+**Detection Keywords**: video filter, scale, crop, overlay, filter chain, custom filter, frame filter, wgpu filter, WGSL shader, GPU custom filter, native subtitle burn-in, opengl filter (deprecated)
 **Aliases**: ffmpeg filter, filter graph, video effects
 
 ## Table of Contents
@@ -14,7 +14,8 @@
 - [Frame Sender Filter](#frame-sender-filter)
 - [Custom Audio Filter Example](#custom-audio-filter-example)
 - [Audio Filter with Resampling](#audio-filter-with-resampling)
-- [OpenGL Filters (GPU Acceleration)](#opengl-filters-gpu-acceleration)
+- [GPU Custom Filters (wgpu)](#gpu-custom-filters-wgpu)
+- [Native Subtitle Burn-in](#native-subtitle-burn-in-subtitle-feature)
 - [Video Effects Example](#video-effects-example)
 - [Complex Filter Graphs](#complex-filter-graphs)
 - [Troubleshooting](#troubleshooting)
@@ -371,9 +372,9 @@ A complete example showing how to create a custom video filter that tiles the in
 **Prerequisites**: Add dependencies to your `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = "0.10.0"
-ffmpeg-next = "7.1.0"
-ffmpeg-sys-next = "7.1.0"
+ez-ffmpeg = "0.12.0"
+ffmpeg-next = "8.1.0"
+ffmpeg-sys-next = "8.1.0"
 log = "0.4"
 env_logger = "0.11"
 ```
@@ -516,62 +517,156 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 **Full example**: See `examples/custom_tile_filter/` in ez-ffmpeg repository
 
-## OpenGL Filters (GPU Acceleration)
+## GPU Custom Filters (wgpu)
 
-Enable with `features = ["opengl"]`:
+Run a custom **WGSL** fragment shader on every frame, on the GPU, and **headless**
+— no X11/Wayland/display, so it works on servers. wgpu does GPU-side YUV↔RGB with
+the correct BT.601/709 (limited/full) matrix, supports output resize, live
+parameter updates, and per-stage timing, and is `Send` without unsafe. It
+supersedes the deprecated OpenGL filter.
+
+Enable the feature and add `bytemuck` (for `#[derive(Pod)]` on param structs):
+```toml
+[dependencies]
+ez-ffmpeg = { version = "0.12.0", features = ["wgpu"] }
+bytemuck = { version = "1.8", features = ["derive"] }
+env_logger = "0.11"
+```
+
+Full example — a colour `adjust` shader with **live parameter updates** and
+**per-frame GPU timing**:
+```rust
+use bytemuck::{Pod, Zeroable};
+use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ez_ffmpeg::wgpu_filter::WgpuFrameFilter;
+use ez_ffmpeg::{AVMediaType, FfmpegContext, Input, Output};
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct AdjustParams {
+    brightness: f32,
+    contrast: f32,
+    saturation: f32,
+    _pad: f32,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+    let shader = include_str!("shaders/adjust.wgsl"); // WGSL fragment shader
+
+    let mut builder = WgpuFrameFilter::builder().shader_wgsl(shader);
+    builder = builder.params(AdjustParams { brightness: 0.0, contrast: 1.1, saturation: 1.0, _pad: 0.0 });
+    let filter = builder.build()?;
+    let stats = filter.stats_handle();
+
+    // Live parameter updates while the pipeline runs:
+    let handle = filter.params_handle::<AdjustParams>()?;
+    std::thread::spawn(move || {
+        for i in 0..100 {
+            handle.set(AdjustParams {
+                brightness: 0.0,
+                contrast: 1.1,
+                saturation: (i as f32 / 50.0 - 1.0).abs() * 2.0,
+                _pad: 0.0,
+            });
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    });
+
+    let pipeline: FramePipelineBuilder = AVMediaType::AVMEDIA_TYPE_VIDEO.into();
+    let pipeline = pipeline.filter("wgpu_effect", Box::new(filter));
+
+    let output = Output::from("output_adjust.mp4")
+        .set_video_codec("libx264")
+        .set_audio_codec("aac")
+        .add_frame_pipeline(pipeline);
+
+    FfmpegContext::builder()
+        .input(Input::from("input.mp4"))
+        // WgpuFrameFilter accepts YUV420P/422P/444P (and J variants) or NV12
+        // directly; only other formats (e.g. 10-bit) need a `format=yuv420p`
+        // filter_desc before the frame pipeline.
+        .output(output)
+        .build()?
+        .start()?
+        .wait()?;
+
+    // Per-stage timing collected during the run (WgpuFilterStats is Copy).
+    if let Ok(s) = stats.lock() {
+        println!(
+            "done | {} frames | upload {:.2}ms gpu {:.2}ms download {:.2}ms per frame",
+            s.frames,
+            s.upload_secs / s.frames.max(1) as f64 * 1000.0,
+            s.gpu_secs / s.frames.max(1) as f64 * 1000.0,
+            s.download_secs / s.frames.max(1) as f64 * 1000.0,
+        );
+    }
+    Ok(())
+}
+```
+
+Minimal grayscale WGSL that matches the shader **contract** — fragment entry
+point `fs_main`, `@group(0)` bindings `texture1` / `sampler1` / `ez: EzUniforms`.
+(A shader with params, like `adjust.wgsl` above, additionally binds them at
+`@group(1) @binding(0)`.)
+```wgsl
+@group(0) @binding(0) var texture1: texture_2d<f32>;
+@group(0) @binding(1) var sampler1: sampler;
+struct EzUniforms { play_time: f32, width: f32, height: f32, _pad: f32 };
+@group(0) @binding(2) var<uniform> ez: EzUniforms;
+
+@fragment
+fn fs_main(@location(0) tex_coord: vec2<f32>) -> @location(0) vec4<f32> {
+    let color = textureSample(texture1, sampler1, tex_coord);
+    let gray = dot(color.rgb, vec3<f32>(0.299, 0.587, 0.114));
+    return vec4<f32>(vec3<f32>(gray), 1.0);
+}
+```
+
+Builder knobs (all on `WgpuFrameFilter::builder()`): `.shader_wgsl(..)`,
+`.output_size(w, h)` (GPU resize), `.params(initial)`, `.frames_in_flight(n)`
+(default 2 = GPU/CPU overlap; 1 = synchronous). For a shader with no params,
+`WgpuFrameFilter::new_simple(shader)?` is a one-liner. Live updates go through
+`filter.params_handle::<P>()?` + `handle.set(value)`; timing through
+`filter.stats_handle()` → `WgpuFilterStats { frames, upload_secs, gpu_secs, download_secs }`.
+
+### Deprecated: OpenGL
+
+The `opengl` feature and `OpenGLFrameFilter` are `#[deprecated(since = "0.11.0")]`.
+Prefer the wgpu filter above: it is headless (no X11/Wayland or Xvfb virtual
+framebuffer), does correct GPU-side colour conversion, and is `Send` without
+unsafe. Existing OpenGL code still compiles, but new code should use `WgpuFrameFilter`.
+
+## Native Subtitle Burn-in (subtitle feature)
+
+Burn `.srt`/`.ass`/`.vtt` (or in-memory subtitle content) into video with a
+pure-Rust renderer — **no `--enable-libass` FFmpeg build flag and no system
+libass required**. Enable `features = ["subtitle"]` and attach `SubtitleFilter`
+to the output frame pipeline:
 
 ```rust
-use ez_ffmpeg::opengl::opengl_frame_filter::OpenGLFrameFilter;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::{FfmpegContext, Output};
-use ffmpeg_sys_next::AVMediaType;
+use ez_ffmpeg::subtitle::SubtitleFilter;
+use ez_ffmpeg::{AVMediaType, FfmpegContext, Output};
 
-// Fragment shader for video effects (e.g., color inversion)
-let fragment_shader = r#"
-#version 330 core
-in vec2 TexCoords;
-out vec4 FragColor;
-uniform sampler2D screenTexture;
+// `srt` is any &str of SubRip content (from a file, DB, or ASR output).
+let filter = SubtitleFilter::builder()
+    .srt_content(srt)                       // or .file("subs.srt") / .ass_content(script)
+    .force_style("FontSize=28,Outline=1")   // FFmpeg force_style semantics
+    .build()?;
 
-void main() {
-    vec4 color = texture(screenTexture, TexCoords);
-    // Example: Invert colors
-    FragColor = vec4(1.0 - color.rgb, color.a);
-}
-"#;
-
-// Create frame pipeline with OpenGL filter
-let frame_pipeline_builder: FramePipelineBuilder = AVMediaType::AVMEDIA_TYPE_VIDEO.into();
-let filter = OpenGLFrameFilter::new_simple(fragment_shader.to_string()).unwrap();
-let frame_pipeline_builder = frame_pipeline_builder.filter("effect", Box::new(filter));
-
-// Apply to output
+let pipeline: FramePipelineBuilder = AVMediaType::AVMEDIA_TYPE_VIDEO.into();
 FfmpegContext::builder()
-    .input("input.mp4")
-    .output(Output::from("output.mp4")
-        .add_frame_pipeline(frame_pipeline_builder))
+    .input("video.mp4")
+    .output(
+        Output::from("output.mp4")
+            .add_frame_pipeline(pipeline.filter("subtitles", Box::new(filter))),
+    )
     .build()?.start()?.wait()?;
 ```
 
-**Common Shader Effects**:
-```glsl
-// Grayscale
-float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-FragColor = vec4(gray, gray, gray, color.a);
-
-// Sepia
-vec3 sepia = vec3(
-    dot(color.rgb, vec3(0.393, 0.769, 0.189)),
-    dot(color.rgb, vec3(0.349, 0.686, 0.168)),
-    dot(color.rgb, vec3(0.272, 0.534, 0.131))
-);
-FragColor = vec4(sepia, color.a);
-
-// Vignette
-vec2 center = TexCoords - 0.5;
-float vignette = 1.0 - dot(center, center);
-FragColor = vec4(color.rgb * vignette, color.a);
-```
+Full walkthrough (source options, fonts, `FontProvider` / `TextShaping`) in
+[scenarios/subtitles.md](../scenarios/subtitles.md#burn-subtitles-hardcode).
 
 ## Video Effects Example
 
@@ -667,10 +762,19 @@ Error: Discarding frame with invalid format
 - Ensure sender/receiver are in separate threads.
 - Handle channel closure gracefully in `request_frame()`.
 
-### OpenGL Filter Issues
+### wgpu Filter Issues
 
-**OpenGL context not available**:
-- Ensure `opengl` feature is enabled in `Cargo.toml`.
-- On headless servers, use virtual framebuffer (Xvfb on Linux).
-- Check GPU drivers are properly installed.
+**No GPU adapter found**:
+- wgpu selects an available backend (Vulkan/Metal/DX12/GL); make sure GPU drivers
+  are installed. On headless Linux, a real or software Vulkan device (e.g. Mesa
+  lavapipe) suffices — no X11/Wayland display or Xvfb needed.
+
+**Frame format rejected**:
+- `WgpuFrameFilter` accepts YUV420P/422P/444P (and J variants) and NV12 directly.
+  For other formats (e.g. 10-bit), add `.filter_desc("format=yuv420p")` before the
+  frame pipeline.
+
+**WGSL shader fails to compile**:
+- The fragment entry point must be `fs_main` with `@group(0)` bindings
+  `texture1` / `sampler1` / `ez: EzUniforms`; bind user params at `@group(1) @binding(0)`.
 

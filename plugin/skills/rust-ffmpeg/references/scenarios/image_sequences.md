@@ -14,6 +14,49 @@ Cross-library guide for converting between video and image sequences.
 | Frame rate control | `.filter_desc("fps=...")` | Manual timing | `-r` argument |
 | Quality control | `.set_video_qscale()` | Encoder options | `-q:v` argument |
 
+## One-shot thumbnail / sprite sheet (recipes)
+
+For the common "grab one thumbnail" or "build a storyboard sprite sheet" tasks, ez-ffmpeg ships typed one-shot recipes in `ez_ffmpeg::recipes` — **no feature flag, default build**. Each recipe owns the underlying `select` / `fps` / `scale` / `tile` / `-q:v` wiring, so you pass options instead of a filter string.
+
+### ez-ffmpeg
+
+```rust
+use ez_ffmpeg::recipes::{sprite_sheet, thumbnail, At, Every, SpriteSheetOptions, ThumbnailOptions};
+
+// A single 320px-wide thumbnail at 12 seconds.
+thumbnail(
+    "video.mp4",
+    "thumb.jpg",
+    ThumbnailOptions {
+        at: At::Sec(12.0),
+        width: Some(320),
+        ..ThumbnailOptions::default()
+    },
+)?;
+
+// A 5x5 storyboard sprite sheet, one 160x90 cell every 2 seconds.
+sprite_sheet(
+    "video.mp4",
+    "sheet.jpg",
+    SpriteSheetOptions {
+        grid: (5, 5),
+        every: Every::Sec(2.0),
+        cell: (160, 90),
+        quality: 3,
+    },
+)?;
+```
+
+**Picking the frame — `At`**: `At::Sec(12.0)` (wall-clock seconds), `At::Frame(n)` (zero-based decode-order index; `SeekMode` is ignored for this variant), or `At::Percent(50.0)` (`0..=100`, needs a probeable file/URL input).
+
+**Seek strategy — `SeekMode`** (`ThumbnailOptions::seek`, default `InputSeek`):
+- `SeekMode::InputSeek` — seeks at the input level. **Fast** for large offsets, but keyframe-approximate: it does not promise exact-second precision.
+- `SeekMode::FilterScan` — decodes from the start and picks the exact target frame. **Accurate**, but slow for large offsets in a long file.
+
+**Sprite cadence — `Every`**: `Every::Sec(2.0)` (one frame every N seconds), `Every::Frames(n)` (every N-th decoded frame), or `Every::EvenlySpread` (spread the `cols * rows` cells evenly across the whole clip — a full-video storyboard; needs a probeable input). The sheet always contains exactly `grid.0 * grid.1` cells.
+
+`quality` is the `-q:v` scale (`2..=31`, lower is better) and only affects lossy encoders such as MJPEG (`.jpg`) / WebP (`.webp`); it is a no-op for lossless PNG.
+
 ## Video to Image Sequence
 
 ### ez-ffmpeg

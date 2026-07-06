@@ -3,14 +3,14 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.10.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.12.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
 
 ## Prerequisites
 
-- **FFmpeg**: 7.x installed on system (see [installation.md](installation.md) for platform-specific setup)
-- **Rust**: 1.70+ (MSRV)
+- **FFmpeg**: 7.0 through 8.x installed on system — one build links either major (see [installation.md](installation.md) for platform-specific setup)
+- **Rust**: 1.80+ (MSRV)
 
 ## Table of Contents
 
@@ -136,7 +136,7 @@ let output = Output::from("output.mp4")
     .set_video_codec_opt("crf", "23")     // Quality
     .set_audio_codec("aac")               // Audio encoder
     .set_audio_codec_opt("b", "128k")     // Audio bitrate
-    .set_format_opt("t", "60")            // Duration limit
+    .set_recording_time_us(60_000_000)    // Duration limit (60s); "t" is not a muxer AVOption
     .set_max_video_frames(1)              // Frame limit (thumbnails)
     .set_video_qscale(2)                  // Quality scale
     .set_framerate(AVRational { num: 30, den: 1 })  // Output framerate
@@ -213,7 +213,7 @@ FfmpegContext::builder()
 | Streaming | [streaming.md](ez_ffmpeg/streaming.md) | RTMP push, HLS generation, re-streaming |
 | Device Capture | [capture.md](ez_ffmpeg/capture.md) | Camera, microphone, screen capture |
 | Media Query | [query.md](ez_ffmpeg/query.md) | Duration, metadata, codecs, devices |
-| Filters | [filters.md](ez_ffmpeg/filters.md) | Built-in filters, custom FrameFilter, OpenGL |
+| Filters | [filters.md](ez_ffmpeg/filters.md) | Built-in filters, custom FrameFilter, wgpu GPU filters (OpenGL deprecated) |
 | Advanced | [advanced.md](ez_ffmpeg/advanced.md) | Hardware accel, custom I/O, frame pipelines |
 
 ## Installation
@@ -224,7 +224,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.10.0", features = ["async"] }
+ez-ffmpeg = { version = "0.12.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -235,19 +235,26 @@ ez-ffmpeg = { version = "0.10.0", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.10.0", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.12.0", features = ["async", "static"] }
 
-# Build from source (last resort when system FFmpeg unavailable)
-ez-ffmpeg = { version = "0.10.0", features = ["async", "build"] }
+# Build FFmpeg from source (last resort when system FFmpeg unavailable).
+# ez-ffmpeg has NO `build` feature — enable it through the underlying sys crate:
+ez-ffmpeg = { version = "0.12.0", features = ["async"] }
+ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 ```
 
-> See [installation.md](installation.md) for detailed `build` feature usage and license options (GPL, non-free).
+> ez-ffmpeg's own features are `async`, `static`, `rtmp`, `flv`, `subtitle`, `wgpu`, `opengl` (deprecated). The `build` (compile-FFmpeg-from-source) feature lives on `ffmpeg-sys-next` / `ffmpeg-next`; see [installation.md](installation.md) for license options (GPL, non-free).
 
 ## Features
 
 | Feature | Purpose |
 |---------|---------|
 | `async` | Tokio async support |
+| `wgpu` | GPU-accelerated custom WGSL filters (headless, no display) |
+| `subtitle` | Native pure-Rust ASS/SRT subtitle burn-in (no libass) |
 | `rtmp` | Embedded high-concurrency RTMP server |
-| `opengl` | GPU-accelerated filters |
+| `flv` | FLV muxing/demuxing (pulled in by `rtmp`) |
 | `static` | Static linking (Windows) |
+| `opengl` | GPU filters — **deprecated since 0.11.0, use `wgpu`** |
+
+> `analysis` (detection/measurement) and `recipes` (thumbnail/gif/HLS ladder) need **no** feature flag — they are in the default build.

@@ -93,6 +93,39 @@ See [Library Selection Guide](../library_selection.md) for detailed criteria.
 .args(["-preset", "ultrafast", "-tune", "zerolatency"])
 ```
 
+## VOD ABR ladder (HlsLadder)
+
+For **video-on-demand** (not live), ez-ffmpeg ships a one-shot ABR ladder recipe in `ez_ffmpeg::recipes` — **no feature flag, default build**. `HlsLadder` decodes the input once, fans it out to several scaled renditions, and writes each as its own HLS media playlist plus a generated master playlist. The cross-rendition keyframe alignment that the manual [Streaming Best Practices](#streaming-best-practices) below spell out by hand is done for you.
+
+```rust
+use ez_ffmpeg::recipes::HlsLadder;
+
+HlsLadder::new("input.mp4", "hls_out")
+    .segment_duration(6.0)
+    .rendition(1920, 1080, "5000k")
+    .rendition(1280, 720, "2800k")
+    .rendition(854, 480, "1400k")
+    .audio_bitrate("128k")
+    .fps(30, 1) // CFR frame rate; omit to probe it from the input.
+    .master("master.m3u8")
+    .run()?;
+// Writes hls_out/master.m3u8 + one index.m3u8 and segments per rendition.
+```
+
+Handled automatically:
+- **Fixed-GOP keyframe alignment across renditions** — every rendition shares the CFR input and the same GOP length, so their keyframe PTS coincide and segments are cross-switchable (via `g` / `keyint_min` / `sc_threshold`, not `force_key_frames`).
+- **`yuv420p` per rendition** — each rendition's output pad is set to `yuv420p` for broad player compatibility.
+- **Master playlist** — a conservative `master.m3u8` (with `BANDWIDTH` / `RESOLUTION` per variant) is generated, and only written to disk after the transcode succeeds.
+
+Key knobs:
+- **`.fps(num, den)`** declares the **CFR** frame rate used to derive the fixed GOP. **Omit it to probe the rate from the input** — it is only required for non-probeable inputs (e.g. callback sources).
+- **`.segment_duration(secs)`** must be an integer multiple of the GOP length (default GOP == segment duration; override with `.gop_seconds(secs)`).
+- **`.video_codec("libx264")` / `.audio_codec("aac")` / `.audio_bitrate("128k")`** set the encoders and audio rate.
+- **`.rendition_named(Rendition::new(w, h, "5000k").with_name("hd"))`** appends a rendition with a custom directory/variant name; **`.codecs("avc1.640028,mp4a.40.2")`** sets the master `CODECS` attribute.
+- **`.build_context()`** returns the underlying `FfmpegContext` if you want to drive the scheduler yourself instead of calling `.run()`.
+
+**MVP scope**: CFR VOD only — a single video stream plus a single optional audio track. No live/event playlists, audio groups, or encryption (use the manual HLS patterns above for those).
+
 ## Streaming Best Practices
 
 ### Keyframe Alignment (Critical for HLS/DASH)

@@ -8,13 +8,13 @@ Quick patterns for integrating FFmpeg with web servers, storage systems, and asy
 > **Integration Dependencies** (used in examples below):
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.10.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.12.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > axum = "0.7"            # Web framework example
 > aws-sdk-s3 = "1"        # S3 integration example
 >
 > # For ffmpeg-sidecar (sync/blocking)
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > actix-web = "4"         # Sync web framework example
 > ```
 

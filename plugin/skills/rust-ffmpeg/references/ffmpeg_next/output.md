@@ -26,7 +26,7 @@ The PPM format from transcoding examples is raw and large. For production use, s
 **Cargo.toml**:
 ```toml
 [dependencies]
-ffmpeg-next = "7.1.0"
+ffmpeg-next = "8.1.0"
 image = "0.25"
 ```
 

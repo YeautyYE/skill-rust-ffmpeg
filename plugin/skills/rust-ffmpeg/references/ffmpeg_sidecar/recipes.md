@@ -8,7 +8,7 @@ Quick-start recipes for common ffmpeg-sidecar use cases.
 > **Dependencies**: Examples use `anyhow` for error handling (following ffmpeg-sidecar's official examples):
 > ```toml
 > [dependencies]
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > anyhow = "1"
 > ```
 

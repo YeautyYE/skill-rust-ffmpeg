@@ -6,7 +6,7 @@
 FFmpeg process wrapper for Rust with typed event streams, progress monitoring, and cross-platform binary management.
 
 **Crate**: https://crates.io/crates/ffmpeg-sidecar
-**Version**: 2.4.0 ([crates.io](https://crates.io/crates/ffmpeg-sidecar))
+**Version**: 2.5.2 ([crates.io](https://crates.io/crates/ffmpeg-sidecar))
 **Repository**: https://github.com/nathanbabcock/ffmpeg-sidecar
 
 > **When to Use**: Choose ffmpeg-sidecar when you need to wrap FFmpeg CLI commands with Rust type safety, cannot install FFmpeg development libraries, or prefer process-based isolation. For direct library integration, see [ez-ffmpeg](ez_ffmpeg.md) or [ffmpeg-next](ffmpeg_next.md).
@@ -40,7 +40,7 @@ FFmpeg process wrapper for Rust with typed event streams, progress monitoring, a
 Add to `Cargo.toml`:
 ```toml
 [dependencies]
-ffmpeg-sidecar = "2.4.0"
+ffmpeg-sidecar = "2.5.2"
 ```
 
 ```rust

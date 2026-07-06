@@ -24,9 +24,9 @@ let scheduler = FfmpegContext::builder()
         .set_audio_codec("aac"))
     .build()?.start()?;
 
-// Record 10 seconds then stop
+// Record 10 seconds then stop gracefully (flushes encoders, output is valid)
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.abort();
+scheduler.stop();  // use stop() for a valid file; abort() is emergency-only (output not guaranteed)
 ```
 
 ```rust
@@ -49,7 +49,7 @@ FfmpegCommand::new()
 | Aspect | ez-ffmpeg | ffmpeg-next | ffmpeg-sys-next | ffmpeg-sidecar |
 |--------|-----------|-------------|-----------------|----------------|
 | **Async support** | ✅ Yes | ❌ No | ❌ No | ❌ No |
-| **Graceful stop** | ✅ `abort()` | Manual signal | Manual signal | Process kill |
+| **Graceful stop** | ✅ `stop()` (valid file) | Manual signal | Manual signal | Process kill |
 | **Device enumeration** | ✅ Built-in API | ❌ Manual | ❌ Manual | Via CLI args |
 | **Code complexity** | Low | High | Very High | Low |
 | **Use when** | General capture | Custom processing | Max performance | No install |
@@ -125,7 +125,7 @@ fn create_capture_input() -> Input {
 
 - **Always use `ultrafast` preset** for real-time capture — encoding must keep up with input framerate
 - **Hardware encoding** (`h264_videotoolbox` on macOS, `h264_nvenc` on NVIDIA) reduces CPU load significantly
-- **`abort()` is safe** in ez-ffmpeg — output file is valid up to the abort point
+- **Use `stop()` to end a capture** in ez-ffmpeg — it blocks until encoders flush, so the output file is valid. `abort()` is emergency-only and does **not** guarantee a valid file
 - **Separate video/audio devices** when built-in combo device has quality issues
 
 ## Detailed Examples

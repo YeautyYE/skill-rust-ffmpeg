@@ -11,8 +11,8 @@ Cross-library guide for reading, writing, and manipulating media metadata and ch
 |-----------|-----------|-------------|----------------|
 | Read metadata | `get_metadata()` | `ctx.metadata()` | `ffprobe` JSON |
 | Write metadata | `.add_metadata()` | `octx.set_metadata()` | `-metadata` args |
-| Read chapters | Not yet supported | `ctx.chapters()` | `ffprobe` JSON |
-| Write chapters | Not yet supported | `octx.add_chapter()` | `-map_chapters` |
+| Read chapters | `get_chapter_metadata(path, i)` (per-chapter tags) | `ctx.chapters()` | `ffprobe` JSON |
+| Write chapters | `.add_chapter_metadata(i, k, v)` | `octx.add_chapter()` | `-map_chapters` |
 
 ## Reading Metadata
 

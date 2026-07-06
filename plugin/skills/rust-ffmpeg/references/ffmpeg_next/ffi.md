@@ -355,11 +355,26 @@ fn frame_time_seconds(frame: &ffmpeg_next::frame::Frame, stream_time_base: Ratio
 - You need reference-counted frame sharing
 - You need to copy properties atomically
 - Performance profiling shows FFI is faster for your use case
-- You need custom I/O callbacks for special input sources
+- You need custom I/O beyond what the safe `StreamIo` API (below) can express
 
 ## Custom I/O Callbacks
 
-For reading from non-standard sources (memory buffers, custom protocols, encrypted streams):
+> **Prefer the safe API first (ffmpeg-next 8.x+).** For most custom-source needs you no longer need raw FFI: `ffmpeg_next::format::context::StreamIo` wraps any Rust `Read`/`Write`(+ optional `Seek`) `+ Send`, and `format::input_from_stream(io, filename, opts)` / `format::output_to_stream(io, filename, format)` build a safe `Input`/`Output` from it.
+>
+> ```rust
+> use ffmpeg_next::format::{self, context::StreamIo};
+> use std::io::Cursor;
+>
+> // Demux an MP4 held entirely in memory (any Read + Seek + Send):
+> let bytes = std::fs::read("input.mp4")?;
+> let io = StreamIo::from_read_seek(Cursor::new(bytes))?;
+> let mut ictx = format::input_from_stream(io, Some("input.mp4"), None)?;
+> // ... iterate ictx.packets() as usual ...
+> ```
+>
+> Drop to the raw `AVIOContext` callbacks below only for cases the safe wrapper can't express (e.g. non-seekable custom protocols with bespoke seek semantics).
+
+For reading from non-standard sources (memory buffers, custom protocols, encrypted streams) at the raw FFI level:
 
 ```rust
 use ffmpeg_sys_next::{

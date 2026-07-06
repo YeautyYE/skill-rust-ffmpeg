@@ -8,7 +8,7 @@ Installation guide, auto-download features, and platform-specific configuration 
 > **Dependencies**: Examples use `anyhow` for error handling:
 > ```toml
 > [dependencies]
-> ffmpeg-sidecar = "2.4.0"
+> ffmpeg-sidecar = "2.5.2"
 > anyhow = "1"
 > ```
 
@@ -24,7 +24,7 @@ Installation guide, auto-download features, and platform-specific configuration 
 
 ```toml
 [dependencies]
-ffmpeg-sidecar = "2.4.0"
+ffmpeg-sidecar = "2.5.2"
 ```
 
 **Prerequisites**: FFmpeg binary must be in PATH, or use the `download_ffmpeg` feature for automatic installation.
@@ -33,7 +33,7 @@ ffmpeg-sidecar = "2.4.0"
 
 ```toml
 [dependencies.ffmpeg-sidecar]
-version = "2.4.0"
+version = "2.5.2"
 features = ["download_ffmpeg", "named_pipes"]
 ```
 
@@ -61,6 +61,8 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+> **Slimmer downloads (2.5+)**: set the `KEEP_ONLY_FFMPEG=1` (or `true`) environment variable before `auto_download()` to keep only the `ffmpeg` binary and drop `ffplay`/`ffprobe` — handy for CI images and smaller containers. For manual archive handling, `download::unpack_ffmpeg_without_extras(&archive, &dir)` does the same at unpack time.
 
 ### With Progress Callback
 

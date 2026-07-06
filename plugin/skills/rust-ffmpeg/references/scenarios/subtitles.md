@@ -40,7 +40,68 @@ FfmpegCommand::new()
 
 ### Burn Subtitles (Hardcode)
 
-**Using ez-ffmpeg**:
+**Native burn-in with `SubtitleFilter` (preferred, ez-ffmpeg)** — a pure-Rust
+renderer runs inside the frame pipeline, so this needs **no `--enable-libass`
+FFmpeg build flag, no system libass, and no temporary subtitle files**. It works
+with any FFmpeg build configuration in the supported 7.0–8.x range and accepts
+in-memory subtitle content (e.g. ASR output).
+
+Enable the feature in `Cargo.toml`:
+```toml
+[dependencies]
+ez-ffmpeg = { version = "0.12.0", features = ["subtitle"] }
+```
+
+```rust
+use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ez_ffmpeg::subtitle::SubtitleFilter;
+use ez_ffmpeg::{AVMediaType, FfmpegContext, Output};
+
+// Subtitles straight from memory; .srt/.ass/.vtt files work too via
+// `.file("subs.srt")`, and full in-memory ASS scripts via `.ass_content(script)`.
+let srt = "\
+1
+00:00:00,500 --> 00:00:02,500
+Hello from ez-ffmpeg!
+
+2
+00:00:02,500 --> 00:00:04,800
+<i>Native pure-Rust burn-in</i> - no FFmpeg build flags needed.
+";
+
+let filter = SubtitleFilter::builder()
+    .srt_content(srt)
+    // Style overrides use FFmpeg `force_style` semantics:
+    .force_style("FontSize=28,Outline=1")
+    // For reproducible fonts (e.g. app-shipped ones):
+    // .fonts_dir("assets/fonts")
+    // .default_font_file("assets/fonts/NotoSansSC-Regular.otf")
+    // .font_provider(ez_ffmpeg::subtitle::FontProvider::None)
+    .build()?;
+
+// Attach on the output side: subtitles render against the final,
+// post-filter-graph geometry, right before encoding.
+let pipeline: FramePipelineBuilder = AVMediaType::AVMEDIA_TYPE_VIDEO.into();
+FfmpegContext::builder()
+    .input("video.mp4")
+    .output(
+        Output::from("output.mp4")
+            .add_frame_pipeline(pipeline.filter("subtitles", Box::new(filter))),
+    )
+    .build()?.start()?.wait()?;
+```
+
+Source options on the builder (pick one): `.file(path)` (.srt/.ass/.vtt),
+`.srt_content(s)`, `.ass_content(s)` (full ASS/SSA script), `.stream_index(i)`
+(burn an embedded subtitle stream). Styling/fonts: `.force_style(s)`,
+`.fonts_dir(dir)`, `.default_font_file(f)`, `.default_family(name)`,
+`.font_provider(FontProvider)` (`Autodetect` default, or `None` for
+deterministic explicit-fonts-only), `.font_scale(f64)`, `.shaping(TextShaping)`.
+`build()` validates up front, so a bad option logs and skips the attach instead
+of aborting mid-transcode.
+
+**Fallback — FFmpeg native `subtitles` filter (only when the linked FFmpeg was
+built with `--enable-libass`)**:
 ```rust
 let escaped_srt = srt_file.replace("\\", "/").replace(":", "\\:");
 
@@ -52,7 +113,7 @@ FfmpegContext::builder()
     .build()?.start()?.wait()
 ```
 
-**Using ffmpeg-sidecar**:
+**Using ffmpeg-sidecar** (invokes the ffmpeg binary's `subtitles` filter — also requires libass):
 ```rust
 FfmpegCommand::new()
     .input("video.mp4")
@@ -165,7 +226,7 @@ FfmpegCommand::new()
 ## Decision Guide
 
 ```
-IF need permanent subtitles → Burn with subtitles filter
+IF need permanent subtitles → Native SubtitleFilter burn-in (no libass), or subtitles filter if FFmpeg has libass
 ELIF need toggleable subtitles → Embed as soft subtitle
 ELIF MP4 container → Use mov_text codec
 ELIF MKV container → Use srt or ass codec
@@ -180,8 +241,9 @@ ELSE → Convert format by changing extension
 | Pattern | ez-ffmpeg | ffmpeg-sidecar |
 |---------|-----------|----------------|
 | Extract first sub | `.add_stream_map("0:s:0")` | `.args(["-map", "0:s:0"])` |
-| Burn external SRT | `.filter_desc("subtitles='file.srt'")` | `.args(["-vf", "subtitles=file.srt"])` |
-| Burn embedded | `.filter_desc("subtitles=input.mkv:si=0")` | `.args(["-vf", "subtitles=input.mkv:si=0"])` |
+| Native burn (no libass) | `SubtitleFilter::builder().srt_content(..).build()` + `.add_frame_pipeline(..)` | N/A (needs libass) |
+| Burn external SRT (needs libass) | `.filter_desc("subtitles='file.srt'")` | `.args(["-vf", "subtitles=file.srt"])` |
+| Burn embedded (needs libass) | `.filter_desc("subtitles=input.mkv:si=0")` | `.args(["-vf", "subtitles=input.mkv:si=0"])` |
 | Embed soft (MP4) | `.set_subtitle_codec("mov_text")` | `.args(["-c:s", "mov_text"])` |
 | Embed soft (MKV) | `.set_subtitle_codec("srt")` | `.args(["-c:s", "srt"])` |
 | Style subtitles | `.filter_desc("subtitles='f.srt':force_style='FontSize=24'")` | `.args(["-vf", "subtitles=f.srt:force_style='FontSize=24'"])` |

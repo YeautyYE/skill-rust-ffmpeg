@@ -45,10 +45,10 @@ let scheduler = FfmpegContext::builder()
     .build()?.start()?;
 
 // Record for 10 seconds then stop
-// Note: abort() immediately stops processing. For capture scenarios,
-// the output file will be valid up to the point of abort.
+// Note: stop() blocks until encoders flush, so the capture file is valid.
+// Use abort() only to cancel/discard (it does not guarantee a valid file).
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.abort();
+scheduler.stop();
 ```
 
 ## Windows: DirectShow
@@ -72,9 +72,9 @@ let scheduler = FfmpegContext::builder()
     .output(output)
     .build()?.start()?;
 
-// Record for duration then stop capture
+// Record for duration then stop capture (stop() = valid file)
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.abort();
+scheduler.stop();
 ```
 
 ## Linux: V4L2 + ALSA
@@ -104,7 +104,7 @@ let scheduler = FfmpegContext::builder()
     .build()?.start()?;
 
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.abort();
+scheduler.stop();  // valid file; abort() is cancel-only
 ```
 
 ## Cross-Platform Pattern
