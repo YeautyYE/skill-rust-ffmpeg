@@ -116,7 +116,7 @@ writeln!(file, "file 'video2.mp4'")?;
 FfmpegContext::builder()
     .input(Input::from("list.txt")
         .set_format("concat")
-        .set_input_opt("safe", "0"))
+        .set_format_opt("safe", "0"))
     .output(Output::from("merged.mp4")
         .set_video_codec("copy")
         .set_audio_codec("copy"))
@@ -137,7 +137,6 @@ FfmpegContext::builder()
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input, Output};
-use ez_ffmpeg::AVRational;
 
 // Scale to 1280x720
 FfmpegContext::builder()
@@ -164,7 +163,7 @@ FfmpegContext::builder()
 FfmpegContext::builder()
     .input("input.mp4")
     .output(Output::from("output.mp4")
-        .set_framerate(AVRational { num: 30, den: 1 }))
+        .set_framerate(30, 1))  // 0.13: (num, den) — the AVRational overload is gone
     .build()?.start()?.wait()?;
 
 // Set input framerate (for DTS estimation or raw streams)
@@ -305,8 +304,8 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Still image to 10-second video
 FfmpegContext::builder()
     .input(Input::from("image.jpg")
-        .set_input_opt("loop", "1")
-        .set_input_opt("framerate", "1"))
+        .set_format_opt("loop", "1")
+        .set_format_opt("framerate", "1"))
     .filter_desc("format=yuv420p")  // Set pixel format via filter
     .output(Output::from("video.mp4")
         .set_recording_time_us(10_000_000)  // 10 seconds

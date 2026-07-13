@@ -272,7 +272,6 @@ FfmpegCommand::new()
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input, Output};
-use ffmpeg_sys_next::AVRational;
 
 // Basic image sequence to video
 FfmpegContext::builder()
@@ -300,7 +299,7 @@ FfmpegContext::builder()
 FfmpegContext::builder()
     .input(Input::from("photos/*.jpg")
         .set_format("image2")
-        .set_input_opt("pattern_type", "glob")
+        .set_format_opt("pattern_type", "glob")
         .set_framerate(30, 1))
     .output(Output::from("timelapse.mp4")
         .set_video_codec("libx264")
@@ -326,14 +325,14 @@ FfmpegContext::builder()
     .output(Output::from("slideshow.mp4")
         .set_video_codec("libx264")
         .set_pix_fmt("yuv420p")
-        .set_framerate(AVRational { num: 30, den: 1 }))  // Output at 30fps
+        .set_framerate(30, 1))  // Output at 30fps (0.13: (num, den) signature)
     .build()?.start()?.wait()?;
 
 // Start from specific frame number
 FfmpegContext::builder()
     .input(Input::from("frames/frame_%04d.png")
         .set_format("image2")
-        .set_input_opt("start_number", "100")  // Start from frame_0100.png
+        .set_format_opt("start_number", "100")  // Start from frame_0100.png
         .set_framerate(30, 1))
     .output(Output::from("output.mp4")
         .set_video_codec("libx264")

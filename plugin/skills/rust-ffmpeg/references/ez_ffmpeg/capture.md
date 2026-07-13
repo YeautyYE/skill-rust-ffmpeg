@@ -19,20 +19,20 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Capture camera + microphone (by device index)
 let input = Input::from("0:0")  // video:audio device indices
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1280x720");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1280x720");
 
 // Capture by device name
 let input = Input::from("FaceTime HD Camera:Built-in Microphone")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1280x720");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1280x720");
 
 // Screen capture (device index 1 is typically screen)
 let input = Input::from("1:none")  // Screen only, no audio
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("capture_cursor", "1");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("capture_cursor", "1");
 
 let output = Output::from("capture.mp4")
     .set_video_codec("libx264")
@@ -46,9 +46,10 @@ let scheduler = FfmpegContext::builder()
 
 // Record for 10 seconds then stop
 // Note: stop() blocks until encoders flush, so the capture file is valid.
+// 0.13: stop() returns Result — finalization errors (trailer write) surface here.
 // Use abort() only to cancel/discard (it does not guarantee a valid file).
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.stop();
+scheduler.stop()?;
 ```
 
 ## Windows: DirectShow
@@ -59,8 +60,8 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Capture camera + microphone (by device name)
 let input = Input::from("video=Integrated Webcam:audio=Microphone")
     .set_format("dshow")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1280x720");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1280x720");
 
 let output = Output::from("capture.mp4")
     .set_video_codec("libx264")
@@ -72,9 +73,9 @@ let scheduler = FfmpegContext::builder()
     .output(output)
     .build()?.start()?;
 
-// Record for duration then stop capture (stop() = valid file)
+// Record for duration then stop capture (stop() = valid file; 0.13: returns Result)
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.stop();
+scheduler.stop()?;
 ```
 
 ## Linux: V4L2 + ALSA
@@ -85,8 +86,8 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Video from V4L2
 let video_input = Input::from("/dev/video0")
     .set_format("v4l2")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1280x720");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1280x720");
 
 // Audio from ALSA
 let audio_input = Input::from("hw:0")
@@ -104,7 +105,7 @@ let scheduler = FfmpegContext::builder()
     .build()?.start()?;
 
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.stop();  // valid file; abort() is cancel-only
+scheduler.stop()?;  // valid file (0.13: returns Result); abort() is cancel-only
 ```
 
 ## Cross-Platform Pattern
@@ -117,24 +118,24 @@ fn create_capture_input() -> Input {
     {
         Input::from("0:0")
             .set_format("avfoundation")
-            .set_input_opt("framerate", "30")
-            .set_input_opt("video_size", "1280x720")
+            .set_format_opt("framerate", "30")
+            .set_format_opt("video_size", "1280x720")
     }
 
     #[cfg(target_os = "windows")]
     {
         Input::from("video=Integrated Webcam:audio=Microphone")
             .set_format("dshow")
-            .set_input_opt("framerate", "30")
-            .set_input_opt("video_size", "1280x720")
+            .set_format_opt("framerate", "30")
+            .set_format_opt("video_size", "1280x720")
     }
 
     #[cfg(target_os = "linux")]
     {
         Input::from("/dev/video0")
             .set_format("v4l2")
-            .set_input_opt("framerate", "30")
-            .set_input_opt("video_size", "1280x720")
+            .set_format_opt("framerate", "30")
+            .set_format_opt("video_size", "1280x720")
     }
 }
 ```
@@ -167,8 +168,8 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Capture and stream to RTMP
 let input = Input::from("0:0")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1280x720");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1280x720");
 
 let output = Output::from("rtmp://server/live/stream_key")
     .set_format("flv")
@@ -191,8 +192,8 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // macOS: Capture video and audio from separate devices
 let video_input = Input::from("FaceTime HD Camera")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1920x1080");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1920x1080");
 
 let audio_input = Input::from("MacBook Pro Microphone")
     .set_format("avfoundation");
@@ -219,9 +220,9 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // macOS: VideoToolbox encoding for capture
 let input = Input::from("0:0")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1920x1080")
-    .set_input_opt("pixel_format", "uyvy422");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1920x1080")
+    .set_format_opt("pixel_format", "uyvy422");
 
 let output = Output::from("capture.mp4")
     .set_video_codec("h264_videotoolbox")
@@ -236,7 +237,7 @@ FfmpegContext::builder()
 // Windows: NVENC encoding for capture
 let input = Input::from("video=Webcam:audio=Microphone")
     .set_format("dshow")
-    .set_input_opt("framerate", "30");
+    .set_format_opt("framerate", "30");
 
 let output = Output::from("capture.mp4")
     .set_video_codec("h264_nvenc")
@@ -257,7 +258,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Record to file while streaming preview
 let input = Input::from("0:0")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30");
+    .set_format_opt("framerate", "30");
 
 // File output (high quality)
 let file_output = Output::from("recording.mp4")
@@ -288,7 +289,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Add watermark to capture
 let camera_input = Input::from("0:0")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30");
+    .set_format_opt("framerate", "30");
 
 let watermark_input = Input::from("logo.png");
 

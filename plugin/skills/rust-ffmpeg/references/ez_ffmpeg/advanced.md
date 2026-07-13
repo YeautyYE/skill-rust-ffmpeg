@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-- ez-ffmpeg 0.12.0+ with FFmpeg 7.0–8.x
+- ez-ffmpeg 0.13.0+ with FFmpeg 7.0–8.x
 - For hardware acceleration: GPU drivers and codec support
   - macOS: VideoToolbox (built-in)
   - Linux: VAAPI/NVENC drivers
@@ -96,6 +96,8 @@ FfmpegContext::builder()
 ## Custom I/O Sources
 
 Use callback-based I/O for non-file sources. Callbacks return `i32` directly (bytes read/written, 0 for EOF, negative for error).
+
+> **0.13**: a panicking custom-IO callback no longer unwinds across the FFI boundary (undefined behavior) — it is contained with `catch_unwind`, poisons that stream context, and surfaces as an I/O error from the job. Still, prefer returning a negative error code over panicking.
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input, Output};
@@ -285,7 +287,7 @@ FfmpegContext::builder()
 Progress monitoring uses a custom FrameFilter:
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::{FfmpegContext, Output};
@@ -315,7 +317,7 @@ struct ProgressFilter { tracker: Arc<ProgressTracker> }
 
 impl FrameFilter for ProgressFilter {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
-    fn filter_frame(&mut self, frame: Frame, _: &FrameFilterContext) -> Result<Option<Frame>, String> {
+    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
         self.tracker.print_progress(&frame);
         Ok(Some(frame))
     }
@@ -341,7 +343,7 @@ FfmpegContext::builder()
 For operations ez-ffmpeg doesn't expose directly, use ffmpeg-next (re-exported):
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::Frame;
 use ffmpeg_sys_next::AVMediaType;
@@ -361,8 +363,8 @@ impl FrameFilter for CustomVideoFilter {
     fn filter_frame(
         &mut self,
         frame: Frame,
-        ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Access frame data for custom processing
         // frame.data(), frame.linesize(), etc.
         Ok(Some(frame))
@@ -385,12 +387,19 @@ let scheduler = FfmpegContext::builder()
 // Run in background, abort after condition
 thread::spawn(move || {
     thread::sleep(Duration::from_secs(30));
-    scheduler.abort();  // Cancel processing
+    scheduler.abort();  // Emergency cancel — output file NOT guaranteed valid
 });
 
 // Or wait for completion
 scheduler.wait()?;
 ```
+
+**Graceful stop vs abort (0.13)**: `stop()` returns `Result<()>` — it flushes
+encoders, writes the trailer, and surfaces finalization errors that were
+previously dropped; the output file is valid on `Ok`. Worker-thread panics
+(including a panicking custom `FrameFilter`) surface as `Error::WorkerPanicked`
+from `stop()`/`wait()` instead of reporting success over an incomplete output.
+`abort()` remains the hard-cancel path (no `Result`, output not guaranteed).
 
 ## Scheduler State Management
 
@@ -425,7 +434,7 @@ For frame processing without writing to file:
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input};
 use ez_ffmpeg::core::context::null_output::create_null_output;
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ffmpeg_next::Frame;
@@ -444,8 +453,8 @@ impl FrameFilter for FrameCounter {
     fn filter_frame(
         &mut self,
         frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         self.count += 1;
         println!("Processed frame {}", self.count);
         Ok(Some(frame))
@@ -469,7 +478,7 @@ For complex frame routing between multiple FFmpeg contexts:
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input, Output};
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::core::context::null_output::create_null_output;
@@ -484,7 +493,7 @@ let (tx, rx): (Sender<Frame>, Receiver<Frame>) = bounded(10);
 struct FrameSender { tx: Sender<Frame> }
 impl FrameFilter for FrameSender {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
-    fn filter_frame(&mut self, frame: Frame, _: &FrameFilterContext) -> Result<Option<Frame>, String> {
+    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
         let _ = self.tx.send(frame.clone());
         Ok(Some(frame))
     }

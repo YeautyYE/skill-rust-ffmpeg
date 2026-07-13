@@ -22,6 +22,8 @@ let duration_secs = duration_us as f64 / 1_000_000.0;
 println!("Duration: {:.2} seconds", duration_secs);
 ```
 
+> **0.13**: `container_info` functions return the crate's own `Error` (not `ffmpeg_next::Error`) and initialize FFmpeg themselves — a bare probe no longer needs a prior context build. `StreamInfo` and its struct variants are `#[non_exhaustive]`: always end matches with `..` in the pattern and a `_ => {}` arm (the examples below already do).
+
 ## Get Format
 
 ```rust

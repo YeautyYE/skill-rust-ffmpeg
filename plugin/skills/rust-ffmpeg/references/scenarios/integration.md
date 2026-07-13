@@ -8,7 +8,7 @@ Quick patterns for integrating FFmpeg with web servers, storage systems, and asy
 > **Integration Dependencies** (used in examples below):
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.12.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.13.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > axum = "0.7"            # Web framework example
 > aws-sdk-s3 = "1"        # S3 integration example
@@ -157,7 +157,7 @@ fn transcode_with_progress(input: &str, output: &str) {
 
 **Using ez-ffmpeg with FrameFilter**:
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::{FfmpegContext, Output};
@@ -173,7 +173,7 @@ struct ProgressFilter {
 
 impl FrameFilter for ProgressFilter {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
-    fn filter_frame(&mut self, frame: Frame, _: &FrameFilterContext) -> Result<Option<Frame>, String> {
+    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
         if let Some(pts) = frame.pts() {
             let current = pts as f64 / 1_000_000.0;
             let total = self.total_duration as f64 / 1_000_000.0;
@@ -393,7 +393,7 @@ use axum::{
     extract::Multipart,
     response::sse::{Event, Sse},
 };
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::{FfmpegContext, Output};
@@ -421,7 +421,7 @@ struct SseProgressFilter {
 impl FrameFilter for SseProgressFilter {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
 
-    fn filter_frame(&mut self, frame: Frame, _: &FrameFilterContext) -> Result<Option<Frame>, String> {
+    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
         self.frame_count += 1;
         if let Some(pts) = frame.pts() {
             let percent = (pts as f64 / self.total_duration as f64 * 100.0).min(100.0);
@@ -562,7 +562,7 @@ use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::Response,
 };
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::{FfmpegContext, Output};
@@ -580,10 +580,10 @@ struct WsProgressFilter {
 impl FrameFilter for WsProgressFilter {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
 
-    fn filter_frame(&mut self, frame: Frame, _: &FrameFilterContext) -> Result<Option<Frame>, String> {
+    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
         // Check for cancellation
         if self.cancelled.load(Ordering::Relaxed) {
-            return Err("Cancelled by user".to_string());
+            return Err("Cancelled by user".into());
         }
 
         self.frame_count += 1;

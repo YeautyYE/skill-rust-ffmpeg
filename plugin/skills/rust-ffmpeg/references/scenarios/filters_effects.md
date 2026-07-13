@@ -668,12 +668,18 @@ FfmpegContext::builder()
 
 ## Custom Rust Filters (ez-ffmpeg)
 
+> Before writing a custom filter for common effects, check the **built-in GPU effect
+> catalog** (0.13+, `features = ["wgpu"]`): `wgpu_filter::effects` has adjust /
+> beauty / sharpen / blur / pixelate / mirror / chroma-key and more as typed one-line
+> constructors — see [ez_ffmpeg/filters.md](../ez_ffmpeg/filters.md#built-in-gpu-effects-wgpu_filtereffects-013).
+
 ### FrameFilter Trait
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ez_ffmpeg::util::ffmpeg_utils::make_frame_writable;
 use ez_ffmpeg::{FfmpegContext, Input, Output};
 use ffmpeg_next::Frame;
 use ffmpeg_sys_next::AVMediaType;
@@ -690,8 +696,13 @@ impl FrameFilter for BrightnessFilter {
     fn filter_frame(
         &mut self,
         mut frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
+        // 0.13: frame buffers are usually refcounted and shared (decoder pool) —
+        // in-place edits corrupt other consumers. Make exclusive first
+        // (cheap when already exclusive, copies when shared):
+        make_frame_writable(&mut frame)?;
+
         // Access Y plane (luminance) for YUV frames
         let data = frame.data_mut(0);
         for pixel in data.iter_mut() {

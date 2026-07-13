@@ -23,7 +23,7 @@ Convert video between formats and codecs across all Rust FFmpeg libraries.
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg
-> ez-ffmpeg = "0.12.0"
+> ez-ffmpeg = "0.13.0"
 >
 > # For ffmpeg-next
 > ffmpeg-next = "8.1.0"

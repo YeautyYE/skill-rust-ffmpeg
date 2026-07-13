@@ -1,6 +1,6 @@
 # ez-ffmpeg: Filters
 
-**Detection Keywords**: video filter, scale, crop, overlay, filter chain, custom filter, frame filter, wgpu filter, WGSL shader, GPU custom filter, native subtitle burn-in, opengl filter (deprecated)
+**Detection Keywords**: video filter, scale, crop, overlay, filter chain, custom filter, frame filter, wgpu filter, WGSL shader, GPU custom filter, built-in GPU effects, beauty filter, chroma key, green screen, pixelate, native subtitle burn-in, opengl filter (deprecated)
 **Aliases**: ffmpeg filter, filter graph, video effects
 
 ## Table of Contents
@@ -14,6 +14,7 @@
 - [Frame Sender Filter](#frame-sender-filter)
 - [Custom Audio Filter Example](#custom-audio-filter-example)
 - [Audio Filter with Resampling](#audio-filter-with-resampling)
+- [Built-in GPU Effects (wgpu_filter::effects, 0.13+)](#built-in-gpu-effects-wgpu_filtereffects-013)
 - [GPU Custom Filters (wgpu)](#gpu-custom-filters-wgpu)
 - [Native Subtitle Burn-in](#native-subtitle-burn-in-subtitle-feature)
 - [Video Effects Example](#video-effects-example)
@@ -111,7 +112,7 @@ FfmpegContext::builder()
 Implement `FrameFilter` trait for custom frame processing:
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
 use ez_ffmpeg::{FfmpegContext, Input, Output};
@@ -126,7 +127,7 @@ impl FrameFilter for GrayscaleFilter {
     }
 
     // Optional: Initialize filter state when pipeline starts
-    fn init(&mut self, _ctx: &FrameFilterContext) -> Result<(), String> {
+    fn init(&mut self, _ctx: &mut FrameFilterContext) -> Result<(), FrameFilterError> {
         // Initialize resources, set up state
         Ok(())
     }
@@ -134,8 +135,8 @@ impl FrameFilter for GrayscaleFilter {
     fn filter_frame(
         &mut self,
         frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Access frame data and modify pixels
         // frame.data(0) for Y plane, etc.
         Ok(Some(frame))
@@ -163,6 +164,12 @@ FfmpegContext::builder()
     .build()?.start()?.wait()?;
 ```
 
+**0.13 trait notes**:
+- Hooks take `&mut FrameFilterContext` and return `FrameFilterError` (a boxed error: `Err("msg".into())` or propagate any error with `?`).
+- **In-place mutation**: frame buffers are usually refcounted and shared (decoder frame pool). Before editing pixels/samples in place, call `ez_ffmpeg::util::ffmpeg_utils::make_frame_writable(&mut frame)?` (cheap when already exclusive, copies when shared) or probe with `frame_is_writable(&frame)`. Building a fresh output frame needs neither.
+- **Polling opt-out**: a pure transform/passthrough filter should override `request_frame_mode()` to return `RequestFrameMode::Never` — a pipeline whose filters are all `Never` blocks on input instead of waking ~1000×/sec to poll no-op filters. Keep the default `MayProduce` only for generator/async filters that emit frames from `request_frame`.
+- **Flush markers**: at end of stream each filter receives a props-only marker frame as its flush cue (probe with `frame_is_eof_marker`); treat it as a flush point, never as an error, and pass it through if unneeded.
+
 ## FrameFilter with Frame Request
 
 For filters that need to request frames (e.g., looping, frame injection):
@@ -174,7 +181,7 @@ crossbeam-channel = "0.5"
 ```
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::Frame;
 use ffmpeg_sys_next::AVMediaType;
@@ -193,16 +200,16 @@ impl FrameFilter for FrameReceiveFilter {
     fn filter_frame(
         &mut self,
         _frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Not used when request_frame is implemented
         Ok(None)
     }
 
     fn request_frame(
         &mut self,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Signal that we need a frame
         let _ = self.sender.send(());
 
@@ -220,7 +227,7 @@ impl FrameFilter for FrameReceiveFilter {
 For sending frames to external processing:
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::Frame;
 use ffmpeg_sys_next::AVMediaType;
@@ -238,12 +245,12 @@ impl FrameFilter for FrameSenderFilter {
     fn filter_frame(
         &mut self,
         frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Clone and send frame to external processor
         let cloned = frame.clone();
         if self.sender.send(cloned).is_err() {
-            return Err("Failed to send frame".to_string());
+            return Err("Failed to send frame".into());
         }
         Ok(Some(frame))  // Pass through original
     }
@@ -253,7 +260,7 @@ impl FrameFilter for FrameSenderFilter {
 ## Custom Audio Filter Example
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::Frame;
 use ffmpeg_sys_next::AVMediaType;
@@ -270,8 +277,8 @@ impl FrameFilter for VolumeFilter {
     fn filter_frame(
         &mut self,
         mut frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Modify audio samples
         // Access via frame.data(0), frame.samples(), etc.
         Ok(Some(frame))
@@ -286,7 +293,7 @@ For audio filters that need specific sample format (e.g., float planar for proce
 **Note**: Requires `ffmpeg-next` and `ffmpeg-sys-next` dependencies for resampling and FFmpeg constants.
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::Frame;
 use ffmpeg_sys_next::AVMediaType;
@@ -304,8 +311,8 @@ impl FrameFilter for AudioProcessFilter {
     fn filter_frame(
         &mut self,
         mut frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Get frame properties
         let format = unsafe { (*frame.as_ptr()).format };
         let nb_channels = unsafe { (*frame.as_ptr()).ch_layout.nb_channels };
@@ -342,6 +349,10 @@ impl FrameFilter for AudioProcessFilter {
         // Now process audio in float planar format
         let nb_samples = unsafe { (*frame.as_ptr()).nb_samples } as usize;
 
+        // 0.13: make the frame exclusive before in-place sample edits —
+        // decoder frames are refcounted and may be shared with other consumers
+        ez_ffmpeg::util::ffmpeg_utils::make_frame_writable(&mut frame)?;
+
         // Process left channel (plane 0)
         let left_data = frame.data(0);
         let left_samples: &mut [f32] = unsafe {
@@ -372,7 +383,7 @@ A complete example showing how to create a custom video filter that tiles the in
 **Prerequisites**: Add dependencies to your `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = "0.12.0"
+ez-ffmpeg = "0.13.0"
 ffmpeg-next = "8.1.0"
 ffmpeg-sys-next = "8.1.0"
 log = "0.4"
@@ -381,7 +392,7 @@ env_logger = "0.11"
 
 **tile_filter.rs** - The custom filter implementation:
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ez_ffmpeg::util::ffmpeg_utils::av_err2str;
 use ffmpeg_next::Frame;
@@ -436,16 +447,15 @@ impl Tile2x2Filter {
 impl FrameFilter for Tile2x2Filter {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
 
-    fn init(&mut self, ctx: &FrameFilterContext) -> Result<(), String> {
+    fn init(&mut self, ctx: &mut FrameFilterContext) -> Result<(), FrameFilterError> {
         log::info!("Initializing Tile2x2Filter: {}", ctx.name());
         Ok(())
     }
 
-    fn filter_frame(&mut self, frame: Frame, _ctx: &FrameFilterContext) -> Result<Option<Frame>, String> {
-        unsafe {
-            if frame.as_ptr().is_null() || frame.is_empty() {
-                return Ok(Some(frame));
-            }
+    fn filter_frame(&mut self, frame: Frame, _ctx: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
+        // Pass flush markers through untouched (0.13: probe with the official helper)
+        if ez_ffmpeg::util::ffmpeg_utils::frame_is_eof_marker(&frame) {
+            return Ok(Some(frame));
         }
         self.validate_frame(&frame)?;
 
@@ -459,7 +469,7 @@ impl FrameFilter for Tile2x2Filter {
             (*out.as_mut_ptr()).format = (*frame.as_ptr()).format;
 
             let ret = av_frame_get_buffer(out.as_mut_ptr(), 0);
-            if ret < 0 { return Err(format!("Buffer alloc failed: {}", av_err2str(ret))); }
+            if ret < 0 { return Err(format!("Buffer alloc failed: {}", av_err2str(ret)).into()); }
 
             av_frame_copy_props(out.as_mut_ptr(), frame.as_ptr());
 
@@ -517,6 +527,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 **Full example**: See `examples/custom_tile_filter/` in ez-ffmpeg repository
 
+## Built-in GPU Effects (wgpu_filter::effects, 0.13+)
+
+Before writing WGSL by hand, check the built-in catalog: 13 named GPU effects with
+typed parameter structs — no shader code, no uniform layouts. Each constructor
+returns an `EffectBuilder`; `.build()?` yields a pipeline-ready `FrameFilter`.
+
+| Effect | Constructor | Typical use |
+|--------|-------------|-------------|
+| Color adjust | `adjust(AdjustParams)` | brightness/contrast/saturation/temperature |
+| Beautify | `beauty_lite(BeautyParams)` | live-stream skin smoothing (heuristic mask tier) |
+| Portrait preset | `portrait()` | fused smoothing + whitening + brightening |
+| Sharpen | `sharpen(SharpenParams)` | detail enhancement |
+| Soft blur | `soft_blur(SoftBlurParams)` | privacy blur (`SoftBlurParams::privacy()`) |
+| Pixelate | `pixelate(PixelateParams)` | mosaic/censor |
+| Transform | `transform(TransformParams)` | mirror/selfie flip, rotate, zoom |
+| Chroma key | `chroma_key(ChromaKeyParams)` | green-screen keying |
+| Fisheye / Magnifier | `fisheye(...)` / `magnifier(...)` | lens effects |
+| Soul / Sway / Swirl / Wave | `soul(...)` / `sway(...)` / `swirl(...)` / `wave(...)` | short-video motion effects |
+
+```rust
+use ez_ffmpeg::wgpu_filter::effects::{adjust, AdjustParams, beauty_lite, BeautyParams, BeautyQuality};
+use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
+use ez_ffmpeg::AVMediaType;
+
+// Color adjust — every Params::default() is neutral (no visible change)
+let effect = adjust(AdjustParams { saturation: 1.2, temperature: 0.15, ..AdjustParams::default() })
+    .build()?;
+
+// Live-stream beautification tuned for integrated GPUs
+let beauty = beauty_lite(BeautyParams::default())
+    .quality(BeautyQuality::Fast)   // kernel size baked at build time
+    .frames_in_flight(1)            // low latency for live
+    .build()?;
+
+// Live parameter updates from any thread (0.13: atomic read-modify-write)
+let params = effect.params_handle();       // typed handle, no turbofish
+params.update(|p| p.saturation = 0.0);     // or params.set(whole_struct)
+
+let pipeline: FramePipelineBuilder = AVMediaType::AVMEDIA_TYPE_VIDEO.into();
+let pipeline = pipeline.filter("adjust", Box::new(effect));
+// output.add_frame_pipeline(pipeline)
+```
+
+Builder knobs: `.output_size(w, h)`, `.frames_in_flight(n)`, `.zero_copy_readback(bool)`,
+`.hw_zero_copy_input(bool)`. Each `Effect` owns a full GPU pipeline — chain multiple
+effects as separate pipeline filters, not fused instances. Errors are the typed
+`WgpuFilterError` (`Error::WgpuFilter`), not `String`.
+
+**Full example**: See `examples/builtin_effects/` in ez-ffmpeg repository
+
 ## GPU Custom Filters (wgpu)
 
 Run a custom **WGSL** fragment shader on every frame, on the GPU, and **headless**
@@ -528,7 +588,7 @@ supersedes the deprecated OpenGL filter.
 Enable the feature and add `bytemuck` (for `#[derive(Pod)]` on param structs):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.12.0", features = ["wgpu"] }
+ez-ffmpeg = { version = "0.13.0", features = ["wgpu"] }
 bytemuck = { version = "1.8", features = ["derive"] }
 env_logger = "0.11"
 ```
@@ -627,8 +687,33 @@ Builder knobs (all on `WgpuFrameFilter::builder()`): `.shader_wgsl(..)`,
 `.output_size(w, h)` (GPU resize), `.params(initial)`, `.frames_in_flight(n)`
 (default 2 = GPU/CPU overlap; 1 = synchronous). For a shader with no params,
 `WgpuFrameFilter::new_simple(shader)?` is a one-liner. Live updates go through
-`filter.params_handle::<P>()?` + `handle.set(value)`; timing through
+`filter.params_handle::<P>()?` + `handle.set(value)` or `handle.update(|p| ...)`
+(atomic read-modify-write, 0.13); timing through
 `filter.stats_handle()` → `WgpuFilterStats { frames, upload_secs, gpu_secs, download_secs }`.
+Build errors are the typed `WgpuFilterError` (0.13: was `String`).
+
+### YUV Passthrough Mode (0.13+)
+
+For color effects natural in YUV (tone curves, LUTs, luma sharpening),
+`.shader_yuv_wgsl(body)` runs the effect directly on **raw YUV code values** —
+no RGBA intermediate, no matrix/range conversion, one less input-sized render
+pass per frame. At unchanged output size an untouched luma plane survives
+bit-for-bit (super-black/white included); subsampled chroma is still resampled.
+
+```wgsl
+// body defines ez_effect, not a full module (no fs_main; RGBA texture not available)
+fn ez_effect(coord: vec2<f32>) -> vec3<f32> {
+    var yuv = ez_sample_yuv(coord);      // (Y, U, V) code values in 0..1
+    yuv.x = clamp(yuv.x * 1.1, 0.0, 1.0); // luma-only tweak
+    return yuv;
+}
+```
+
+Prelude helpers: `ez_sample_yuv`, `ez_luma`, `ez_chroma`, `ez_input_size`,
+`ez_chroma_size`, `ez_output_size`, `ez_play_time`, `ez_full_range()` (branch
+yourself if the effect assumes limited-range headroom — the library never
+range-converts in this mode). User params still bind at `@group(1) @binding(0)`
+(literal `1` required).
 
 ### Deprecated: OpenGL
 

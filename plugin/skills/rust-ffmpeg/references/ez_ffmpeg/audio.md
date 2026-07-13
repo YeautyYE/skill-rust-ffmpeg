@@ -186,6 +186,20 @@ FfmpegContext::builder()
         .set_video_codec("copy")
         .set_audio_codec("aac"))
     .build()?.start()?.wait()?;
+
+// End when the shorter stream ends (FFmpeg -shortest, ez-ffmpeg 0.13+)
+// Classic case: music track longer than the video — without this the
+// output keeps running with frozen video until the audio ends.
+FfmpegContext::builder()
+    .input("video.mp4")
+    .input("long_music.mp3")
+    .output(Output::from("output.mp4")
+        .add_stream_map("0:v")
+        .add_stream_map("1:a")
+        .set_video_codec("copy")
+        .set_audio_codec("aac")
+        .set_shortest(true))
+    .build()?.start()?.wait()?;
 ```
 
 ## Audio Format Conversion
@@ -260,7 +274,7 @@ writeln!(file, "file 'audio2.mp3'")?;
 FfmpegContext::builder()
     .input(Input::from("audio_list.txt")
         .set_format("concat")
-        .set_input_opt("safe", "0"))
+        .set_format_opt("safe", "0"))
     .output(Output::from("merged.mp3")
         .set_audio_codec("copy"))
     .build()?.start()?.wait()?;

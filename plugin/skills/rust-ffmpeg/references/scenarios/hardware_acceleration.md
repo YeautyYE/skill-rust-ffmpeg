@@ -24,7 +24,7 @@ Use GPU and hardware encoders for faster video processing across all Rust FFmpeg
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg
-> ez-ffmpeg = "0.12.0"
+> ez-ffmpeg = "0.13.0"
 >
 > # For ffmpeg-next
 > ffmpeg-next = "8.1.0"
@@ -384,8 +384,19 @@ shader and run it with `WgpuFrameFilter` (`features = ["wgpu"]`). It is headless
 (no X11/Wayland), does GPU-side YUV↔RGB conversion, and supports output resize,
 live parameters, and per-stage timing. This replaces the deprecated OpenGL filter.
 
-See [ez_ffmpeg/filters.md — GPU Custom Filters (wgpu)](../ez_ffmpeg/filters.md#gpu-custom-filters-wgpu)
-for the full example and the WGSL shader contract.
+Before writing WGSL, check the **built-in effect catalog** (0.13+):
+`wgpu_filter::effects` ships 13 typed GPU effects (adjust, beauty_lite/portrait,
+sharpen, soft_blur, pixelate, transform/mirror, chroma_key, fisheye, magnifier,
+soul, sway, swirl, wave) — no shader code needed. For YUV-native color effects
+there is also a YUV-passthrough shader mode (`shader_yuv_wgsl`).
+
+See [ez_ffmpeg/filters.md — Built-in GPU Effects](../ez_ffmpeg/filters.md#built-in-gpu-effects-wgpu_filtereffects-013)
+and [GPU Custom Filters (wgpu)](../ez_ffmpeg/filters.md#gpu-custom-filters-wgpu)
+for full examples and the WGSL shader contract.
+
+> **0.13**: hardware device contexts are deduplicated per specification (including
+> decode-path devices from `set_hwaccel_device`) — repeated jobs no longer register
+> a fresh device each run.
 
 ## ffmpeg-next Software Transcoding (x264)
 

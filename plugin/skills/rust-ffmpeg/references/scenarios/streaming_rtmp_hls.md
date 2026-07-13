@@ -133,15 +133,25 @@ Key knobs:
 Keyframes (I-frames) must align with segment boundaries for smooth playback:
 
 ```rust
-// ez-ffmpeg: Force keyframe every 2 seconds (for 30fps video)
+// ez-ffmpeg: fixed-GOP keyframe alignment (for 30fps video, 2s segments)
+// NOTE: FFmpeg's -force_key_frames is NOT an encoder AVOption — passing it via
+// set_video_codec_opt is ignored (0.13 logs "not recognized by encoder").
+// Fixed GOP achieves the same segment alignment for CFR input:
 .output(Output::from("stream.m3u8")
     .set_format("hls")
     .set_format_opt("hls_time", "2")
     .set_video_codec("libx264")
     .set_video_codec_opt("g", "60")           // GOP size = fps * segment_duration
     .set_video_codec_opt("keyint_min", "60")  // Minimum keyframe interval
-    .set_video_codec_opt("sc_threshold", "0") // Disable scene change detection
-    .set_video_codec_opt("force_key_frames", "expr:gte(t,n_forced*2)")) // Force keyframe every 2s
+    .set_video_codec_opt("sc_threshold", "0")) // Disable scene change detection
+
+// ez-ffmpeg 0.13+: keyframes at explicit absolute times (list form of -force_key_frames)
+// Use when exact cut points are known up front (e.g. chapter marks); expr: is not supported.
+.output(Output::from("stream.m3u8")
+    .set_format("hls")
+    .set_format_opt("hls_time", "2")
+    .set_video_codec("libx264")
+    .set_force_key_frames("0,2,4,6,8,10"))
 
 // ffmpeg-sidecar
 .args(["-g", "60", "-keyint_min", "60", "-sc_threshold", "0"])
@@ -221,9 +231,9 @@ FfmpegContext::builder()
 ```rust
 // ez-ffmpeg: Input with reconnection options
 .input(Input::from("rtmp://source/live/stream")
-    .set_input_opt("reconnect", "1")
-    .set_input_opt("reconnect_streamed", "1")
-    .set_input_opt("reconnect_delay_max", "5"))
+    .set_format_opt("reconnect", "1")
+    .set_format_opt("reconnect_streamed", "1")
+    .set_format_opt("reconnect_delay_max", "5"))
 
 // ffmpeg-sidecar
 .args(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
@@ -399,14 +409,14 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 FfmpegContext::builder()
     .input(Input::from("rtmp://source/live/stream")
         // Increase buffer size for jitter absorption
-        .set_input_opt("buffer_size", "1048576")     // 1MB buffer
-        .set_input_opt("max_delay", "500000")        // 500ms max delay
-        .set_input_opt("analyzeduration", "5000000") // 5s analyze duration
-        .set_input_opt("probesize", "5000000")       // 5MB probe size
+        .set_format_opt("buffer_size", "1048576")     // 1MB buffer
+        .set_format_opt("max_delay", "500000")        // 500ms max delay
+        .set_format_opt("analyzeduration", "5000000") // 5s analyze duration
+        .set_format_opt("probesize", "5000000")       // 5MB probe size
         // Reconnection for network issues
-        .set_input_opt("reconnect", "1")
-        .set_input_opt("reconnect_streamed", "1")
-        .set_input_opt("reconnect_delay_max", "5"))
+        .set_format_opt("reconnect", "1")
+        .set_format_opt("reconnect_streamed", "1")
+        .set_format_opt("reconnect_delay_max", "5"))
     .output(Output::from("rtmp://dest/live/stream")
         .set_format("flv")
         // Output buffer settings
@@ -476,7 +486,7 @@ FfmpegContext::builder()
 // ez-ffmpeg: SRT input (listener mode - wait for connection)
 FfmpegContext::builder()
     .input(Input::from("srt://0.0.0.0:9000?mode=listener")
-        .set_input_opt("timeout", "5000000"))  // 5s connection timeout
+        .set_format_opt("timeout", "5000000"))  // 5s connection timeout
     .output(Output::from("output.mp4")
         .set_video_codec("copy")
         .set_audio_codec("copy"))
@@ -555,8 +565,8 @@ FfmpegContext::builder()
 // ez-ffmpeg: UDP input (receive stream)
 FfmpegContext::builder()
     .input(Input::from("udp://0.0.0.0:1234")
-        .set_input_opt("buffer_size", "65535")
-        .set_input_opt("fifo_size", "1000000"))
+        .set_format_opt("buffer_size", "65535")
+        .set_format_opt("fifo_size", "1000000"))
     .output("received.mp4")
     .build()?.start()?.wait()?;
 ```
@@ -610,9 +620,9 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 
 FfmpegContext::builder()
     .input(Input::from("rtsp://admin:password@192.168.1.100:554/stream1")
-        .set_input_opt("rtsp_transport", "tcp")  // TCP for reliability
-        .set_input_opt("stimeout", "5000000")    // 5s timeout
-        .set_input_opt("buffer_size", "1048576"))
+        .set_format_opt("rtsp_transport", "tcp")  // TCP for reliability
+        .set_format_opt("stimeout", "5000000")    // 5s timeout
+        .set_format_opt("buffer_size", "1048576"))
     .output(Output::from("recording.mp4")
         .set_video_codec("copy")
         .set_audio_codec("copy"))
@@ -621,7 +631,7 @@ FfmpegContext::builder()
 // ez-ffmpeg: RTSP to HLS conversion (camera to web)
 FfmpegContext::builder()
     .input(Input::from("rtsp://camera:554/live")
-        .set_input_opt("rtsp_transport", "tcp"))
+        .set_format_opt("rtsp_transport", "tcp"))
     .output(Output::from("stream/playlist.m3u8")
         .set_format("hls")
         .set_format_opt("hls_time", "2")
@@ -634,7 +644,7 @@ FfmpegContext::builder()
 // ez-ffmpeg: RTSP to RTMP re-streaming
 FfmpegContext::builder()
     .input(Input::from("rtsp://camera:554/live")
-        .set_input_opt("rtsp_transport", "tcp"))
+        .set_format_opt("rtsp_transport", "tcp"))
     .output(Output::from("rtmp://server/live/camera1")
         .set_format("flv")
         .set_video_codec("copy")
@@ -689,7 +699,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Stream to multiple RTMP destinations
 FfmpegContext::builder()
     .input(Input::from("rtsp://camera:554/live")
-        .set_input_opt("rtsp_transport", "tcp"))
+        .set_format_opt("rtsp_transport", "tcp"))
     .output(Output::from("rtmp://server1/live/stream")
         .set_format("flv")
         .set_video_codec("copy")

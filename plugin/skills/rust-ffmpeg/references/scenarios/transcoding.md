@@ -259,13 +259,13 @@ For the complete Transcoder struct with flush handling, see [video_transcoding.m
 
 **Using ez-ffmpeg FrameFilter**:
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 
 struct MyFilter;
 impl FrameFilter for MyFilter {
     fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
-    fn filter_frame(&mut self, frame: Frame, _ctx: &FrameFilterContext)
-        -> Result<Option<Frame>, String> {
+    fn filter_frame(&mut self, frame: Frame, _ctx: &mut FrameFilterContext)
+        -> Result<Option<Frame>, FrameFilterError> {
         Ok(Some(frame))  // Process frame here
     }
 }

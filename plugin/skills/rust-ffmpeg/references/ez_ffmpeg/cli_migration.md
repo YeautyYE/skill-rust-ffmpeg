@@ -34,7 +34,7 @@ ffmpeg [input_options] -i input [output_options] output
 use ez_ffmpeg::{FfmpegContext, Input, Output};
 
 FfmpegContext::builder()
-    .input(Input::from("input").set_input_opt("option", "value"))
+    .input(Input::from("input").set_format_opt("option", "value"))
     .output(Output::from("output").set_video_codec("codec"))
     .build()?.start()?.wait()?;
 ```
@@ -309,11 +309,11 @@ FfmpegContext::builder()
     .output(Output::from("output.wav")
         .set_audio_sample_rate(48000)
         .set_audio_channels(2)
-        .set_audio_sample_fmt(ffmpeg_sys_next::AVSampleFormat::AV_SAMPLE_FMT_S16))
+        .set_audio_sample_fmt("s16"))  // 0.13: sample-format name string, same names as -sample_fmt
     .build()?.start()?.wait()?;
 ```
 
-> `set_audio_sample_fmt` takes the `AVSampleFormat` enum (not a string). It is defined in `ffmpeg-sys-next` — add that crate at the same version as ez-ffmpeg's (`ffmpeg-sys-next = "8.1.0"`) to name the variant, or omit the call to let the encoder pick a supported format.
+> Since 0.13 `set_audio_sample_fmt` takes the FFmpeg sample-format **name** (`"s16"`, `"fltp"`, ...) — the same spelling as the CLI's `-sample_fmt`. An unknown name fails at `build()` with `OpenOutputError::UnknownSampleFormat`. Omit the call to let the encoder pick a supported format. (0.12 took the `AVSampleFormat` enum from `ffmpeg-sys-next`.)
 
 ### High-Quality x264 Encoding
 
@@ -481,7 +481,10 @@ FfmpegContext::builder()
 | `-hwaccel_device dev` | `.set_hwaccel_device("dev")` | HW accel device |
 | `-hwaccel_output_format fmt` | `.set_hwaccel_output_format("fmt")` | HW output format |
 | `-xerror` | `.set_exit_on_error(true)` | Exit on error |
-| `-option value` | `.set_input_opt("option", "value")` | Generic input option |
+| `-option value` | `.set_format_opt("option", "value")` | Generic demuxer option (0.13; `set_input_opt` is a deprecated alias) |
+| decoder opt before `-i` | `.set_video_codec_opt("threads", "4")` | Per-media decoder options — also `set_audio_codec_opt` / `set_subtitle_codec_opt` (0.13+) |
+| `-probesize 32 -analyzeduration 0` idiom | `.set_find_stream_info(false)` | Skip stream probing entirely for faster start (0.13+; params must be self-describing) |
+| — | `.set_find_stream_info_codec_opt(k, v)` | Codec opts used only during probing (0.13+) |
 
 ### Output Options
 
@@ -493,12 +496,24 @@ FfmpegContext::builder()
 | `-c:s codec` | `.set_subtitle_codec("codec")` | Subtitle encoder |
 | `-b:v bitrate` | `.set_video_codec_opt("b", "rate")` | Video bitrate |
 | `-b:a bitrate` | `.set_audio_codec_opt("b", "rate")` | Audio bitrate |
-| `-r fps` | `.set_framerate(AVRational{num,den})` | Output frame rate |
+| `-r fps` | `.set_framerate(num, den)` | Output frame rate (0.13: two ints, e.g. `30, 1`) |
+| `-fpsmax fps` | `.set_framerate_max(num, den)` | Output frame-rate ceiling |
 | `-ar rate` | `.set_audio_sample_rate(rate)` | Audio sample rate (Hz) |
 | `-ac channels` | `.set_audio_channels(channels)` | Audio channel count |
-| `-sample_fmt fmt` | `.set_audio_sample_fmt(AVSampleFormat::AV_SAMPLE_FMT_S16)` | Audio sample format (enum, from `ffmpeg-sys-next`) |
-| `-vsync method` | `.set_vsync_method(VSyncMethod::VsyncCfr)` | Video sync (`VSyncMethod` from `ez_ffmpeg::core::context::output`) |
+| `-sample_fmt fmt` | `.set_audio_sample_fmt("s16")` | Audio sample format by name (0.13; was enum) |
+| `-vsync method` | `.set_vsync_method(VSyncMethod::VsyncCfr)` | Video sync (`VSyncMethod` from `ez_ffmpeg::core::context::output`; `#[non_exhaustive]` since 0.13) |
 | `-bits_per_raw_sample n` | `.set_bits_per_raw_sample(n)` | Bits per raw sample |
+| `-shortest` | `.set_shortest(true)` | Truncate output to shortest stream (0.13+) |
+| `-shortest_buf_duration s` | `.set_shortest_buf_duration_us(us)` | Buffering window for `-shortest` (default 10s) |
+| `-force_key_frames "0,5,10.5"` | `.set_force_key_frames("0,5,10.5")` | Keyframes at listed seconds (0.13+). List form only — `expr:`/`source` are not supported; for interval-based alignment use fixed-GOP codec opts (`g`/`keyint_min`/`sc_threshold`). NOT an encoder AVOption: passing it via `set_video_codec_opt` is ignored with a warning |
+| `-bsf:v filters` | `.set_video_bsf("h264_mp4toannexb")` | Video bitstream filter chain (0.13+) |
+| `-bsf:a filters` | `.set_audio_bsf("aac_adtstoasc")` | Audio bitstream filter chain (0.13+) |
+| `-bsf:s filters` | `.set_subtitle_bsf("...")` | Subtitle bitstream filter chain (0.13+) |
+| `-sws_flags flags` | `.set_sws_opts("flags=lanczos")` | Opts for auto-inserted scalers (0.13+; also on `FilterComplex`) |
+| `-swr_opts opts` | `.set_swr_opts("dither_method=triangular")` | Opts for auto-inserted resamplers (0.13+) |
+| `-attach file` | `.add_attachment("font.ttf")` / `.add_attachment_with_mimetype(path, mime)` | Attachment streams, matroska (0.13+) |
+| `-max_muxing_queue_size n` | `.set_max_muxing_queue_size(n)` | Pre-mux queue packet cap (0.13+) |
+| `-muxing_queue_data_threshold n` | `.set_muxing_queue_data_threshold(n)` | Pre-mux queue byte threshold (0.13+) |
 
 ### Quality & Frame Limits
 

@@ -3,9 +3,12 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.12.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.13.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
+
+**New in 0.13**: `-shortest` support (`set_shortest`), forced keyframes at exact times (`set_force_key_frames`), bitstream filters (`set_video/audio/subtitle_bsf`), matroska attachments (fonts/cover art), graph-level `sws/swr` opts, `find_stream_info` toggle + per-stream probe/decoder codec opts, built-in GPU effect catalog (`wgpu_filter::effects` — 13 effects), YUV-passthrough WGSL mode, in-place frame mutation helpers (`make_frame_writable`).
+**Breaking in 0.13**: `stop()` returns `Result<()>` (worker panics surface as `Error::WorkerPanicked`); `FrameFilter` hooks take `&mut FrameFilterContext` and return boxed `FrameFilterError` instead of `String`; builder setters are infallible — validation moved to `build()` (`OpenInputError/OpenOutputError::InvalidOption`); `set_framerate(num, den)` replaces the `AVRational` form; `set_audio_sample_fmt("s16")` takes a name string; `set_input_opt(s)` deprecated → `set_format_opt(s)`; `StreamInfo`/`VSyncMethod` are `#[non_exhaustive]` (matches need `..`).
 
 ## Prerequisites
 
@@ -40,7 +43,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Basic pipeline
     FfmpegContext::builder()
-        .input(Input::from("input.mp4").set_input_opt("key", "value"))
+        .input(Input::from("input.mp4").set_format_opt("key", "value"))
         .filter_desc("scale=1280:720")  // Optional FFmpeg filter
         .output(Output::from("output.mp4").set_video_codec("libx264"))
         .build()?
@@ -99,12 +102,19 @@ FfmpegContext::builder()
 // Configured Input object
 let input = Input::from("video.mp4")
     .set_format("mp4")                    // Force format
+    .set_format_opt("key", "value")       // Demuxer option (0.13: replaces set_input_opt)
     .set_start_time_us(60_000_000)        // Start time in microseconds
     .set_recording_time_us(30_000_000)    // Recording duration in microseconds
     .set_stop_time_us(90_000_000)         // Stop time in microseconds
     .set_hwaccel("videotoolbox")          // Hardware acceleration
     .set_video_codec("h264_cuvid")        // Decoder
+    .set_video_codec_opt("threads", "4")  // Decoder option (0.13, per media type)
     .set_readrate(1.0);                   // Read rate control
+
+// Probing control (0.13) — skip or tune avformat_find_stream_info
+let low_latency_input = Input::from("rtmp://live/stream")
+    .set_find_stream_info(false)               // Skip probing (faster start; stream params must be self-describing)
+    .set_find_stream_info_codec_opt("threads", "1"); // Or keep probing but tune its decoders
 
 // With custom frame pipeline (see filters.md for FrameFilter implementation)
 let pipeline = FramePipelineBuilder::from(AVMediaType::AVMEDIA_TYPE_VIDEO)
@@ -120,7 +130,7 @@ The `output()` method accepts both string paths (`&str`, `String`) and `Output` 
 ```rust
 use ez_ffmpeg::Output;
 use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ffmpeg_sys_next::{AVMediaType, AVRational};
+use ffmpeg_sys_next::AVMediaType;
 
 // Simple string output
 FfmpegContext::builder()
@@ -139,8 +149,9 @@ let output = Output::from("output.mp4")
     .set_recording_time_us(60_000_000)    // Duration limit (60s); "t" is not a muxer AVOption
     .set_max_video_frames(1)              // Frame limit (thumbnails)
     .set_video_qscale(2)                  // Quality scale
-    .set_framerate(AVRational { num: 30, den: 1 })  // Output framerate
+    .set_framerate(30, 1)                 // Output framerate (num, den — 0.13 signature)
     .set_pix_fmt("yuv420p")               // Output pixel format
+    .set_audio_sample_fmt("s16")          // Sample format by name (0.13: was AVSampleFormat enum)
     .set_start_time_us(0)                 // Output start time
     .set_recording_time_us(30_000_000)    // Output recording duration
     .set_stop_time_us(30_000_000)         // Output stop time
@@ -148,6 +159,17 @@ let output = Output::from("output.mp4")
     .add_stream_map("0:a")                // Map audio stream
     .add_stream_map_with_copy("0:a")      // Copy stream without re-encode
     .add_metadata("title", "My Video");   // Output metadata
+
+// New in 0.13 — invalid values fail at build() as OpenOutputError::InvalidOption
+let output_013 = Output::from("output.mkv")
+    .set_shortest(true)                        // -shortest: truncate to shortest stream
+    .set_shortest_buf_duration_us(30_000_000)  // Tolerated stream gap (default 10s)
+    .set_force_key_frames("0,5,10.5")          // Keyframes at exact seconds (list form only, no expr:)
+    .set_video_bsf("h264_mp4toannexb")         // Bitstream filter chain, no re-encode
+    .set_sws_opts("flags=lanczos")             // Opts for auto-inserted scalers
+    .set_swr_opts("dither_method=triangular")  // Opts for auto-inserted resamplers
+    .add_attachment("assets/DejaVuSans.ttf")   // mkv attachment (fonts for ASS subs)
+    .add_attachment_with_mimetype("cover.png", "image/png");
 
 // Stream disable flags (equivalent to FFmpeg's -vn, -an, -sn, -dn)
 let audio_only = Output::from("audio.mp3")
@@ -224,7 +246,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.12.0", features = ["async"] }
+ez-ffmpeg = { version = "0.13.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -235,11 +257,11 @@ ez-ffmpeg = { version = "0.12.0", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.12.0", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.13.0", features = ["async", "static"] }
 
 # Build FFmpeg from source (last resort when system FFmpeg unavailable).
 # ez-ffmpeg has NO `build` feature — enable it through the underlying sys crate:
-ez-ffmpeg = { version = "0.12.0", features = ["async"] }
+ez-ffmpeg = { version = "0.13.0", features = ["async"] }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 ```
 

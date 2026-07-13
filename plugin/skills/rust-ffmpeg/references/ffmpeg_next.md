@@ -442,7 +442,7 @@ For multi-threaded processing, create separate contexts per thread or use channe
 **Common pattern**: Use ez-ffmpeg for orchestration, ffmpeg-next for specific operations within FrameFilter implementations.
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::FrameFilter;
+use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
 use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
 use ffmpeg_next::software::scaling::{Context as ScalingContext, Flags};
 use ffmpeg_next::format::Pixel;
@@ -462,8 +462,8 @@ impl FrameFilter for FormatConverter {
     fn filter_frame(
         &mut self,
         frame: Frame,
-        _ctx: &FrameFilterContext,
-    ) -> Result<Option<Frame>, String> {
+        _ctx: &mut FrameFilterContext,
+    ) -> Result<Option<Frame>, FrameFilterError> {
         // Convert generic Frame to Video for scaling operations
         let video_frame: ffmpeg_next::frame::Video = unsafe {
             ffmpeg_next::frame::Video::wrap(frame.as_ptr() as *mut _)

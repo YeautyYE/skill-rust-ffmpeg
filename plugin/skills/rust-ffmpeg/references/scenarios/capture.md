@@ -13,8 +13,8 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 
 let input = Input::from("0:0")  // video:audio device indices
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("video_size", "1280x720");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("video_size", "1280x720");
 
 let scheduler = FfmpegContext::builder()
     .input(input)
@@ -26,7 +26,7 @@ let scheduler = FfmpegContext::builder()
 
 // Record 10 seconds then stop gracefully (flushes encoders, output is valid)
 std::thread::sleep(std::time::Duration::from_secs(10));
-scheduler.stop();  // use stop() for a valid file; abort() is emergency-only (output not guaranteed)
+scheduler.stop()?;  // stop() = valid file, 0.13: returns Result; abort() is emergency-only (output not guaranteed)
 ```
 
 ```rust
@@ -69,8 +69,8 @@ FfmpegCommand::new()
 // ez-ffmpeg
 let input = Input::from("1:none")  // Screen device, no audio
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30")
-    .set_input_opt("capture_cursor", "1");
+    .set_format_opt("framerate", "30")
+    .set_format_opt("capture_cursor", "1");
 ```
 
 ### List available devices
@@ -87,7 +87,7 @@ let audio_devices = get_input_audio_devices()?;
 // ez-ffmpeg — dual output: file + RTMP
 let input = Input::from("0:0")
     .set_format("avfoundation")
-    .set_input_opt("framerate", "30");
+    .set_format_opt("framerate", "30");
 
 FfmpegContext::builder()
     .input(input)
@@ -109,15 +109,15 @@ FfmpegContext::builder()
 fn create_capture_input() -> Input {
     #[cfg(target_os = "macos")]
     { Input::from("0:0").set_format("avfoundation")
-        .set_input_opt("framerate", "30").set_input_opt("video_size", "1280x720") }
+        .set_format_opt("framerate", "30").set_format_opt("video_size", "1280x720") }
 
     #[cfg(target_os = "windows")]
     { Input::from("video=Integrated Webcam:audio=Microphone").set_format("dshow")
-        .set_input_opt("framerate", "30").set_input_opt("video_size", "1280x720") }
+        .set_format_opt("framerate", "30").set_format_opt("video_size", "1280x720") }
 
     #[cfg(target_os = "linux")]
     { Input::from("/dev/video0").set_format("v4l2")
-        .set_input_opt("framerate", "30").set_input_opt("video_size", "1280x720") }
+        .set_format_opt("framerate", "30").set_format_opt("video_size", "1280x720") }
 }
 ```
 

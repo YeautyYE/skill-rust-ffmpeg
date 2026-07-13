@@ -49,7 +49,7 @@ in-memory subtitle content (e.g. ASR output).
 Enable the feature in `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.12.0", features = ["subtitle"] }
+ez-ffmpeg = { version = "0.13.0", features = ["subtitle"] }
 ```
 
 ```rust
@@ -148,6 +148,23 @@ FfmpegCommand::new()
     .args(["-c:v", "copy", "-c:s", "mov_text"])
     .output("output.mp4")
     .spawn()?.wait()
+```
+
+**MKV with ASS subs + embedded fonts** (ez-ffmpeg 0.13+, FFmpeg `-attach` parity) —
+attach the fonts the ASS script references so any player renders it correctly:
+```rust
+FfmpegContext::builder()
+    .input("video.mp4")
+    .input("subs.ass")
+    .output(Output::from("output.mkv")
+        .add_stream_map("0:v")
+        .add_stream_map("0:a")
+        .add_stream_map("1:0")
+        .set_subtitle_codec("ass")
+        .set_video_codec("copy")
+        .add_attachment("fonts/NotoSansSC-Regular.otf")  // mimetype inferred for common font types
+        .add_attachment_with_mimetype("fonts/custom.ttf", "font/ttf"))
+    .build()?.start()?.wait()
 ```
 
 ### ffmpeg-next Subtitle Stream Copy

@@ -208,7 +208,7 @@ use ez_ffmpeg::{FfmpegContext, Input, Output};
 // Pull from one RTMP and push to another
 FfmpegContext::builder()
     .input(Input::from("rtmp://source/live/stream")
-        .set_input_opt("live_start_index", "-1"))
+        .set_format_opt("live_start_index", "-1"))
     .output(Output::from("rtmp://destination/live/stream")
         .set_format("flv")
         .set_video_codec("copy")
@@ -357,7 +357,7 @@ For async operations, enable the `async` feature and use `.await`:
 > **Dependencies**:
 > ```toml
 > [dependencies]
-> ez-ffmpeg = { version = "0.12.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.13.0", features = ["async"] }
 > tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 > ```
 
@@ -393,7 +393,7 @@ Error: Connection refused
 ```
 Error: Connection timed out
 ```
-- Add timeout option: `.set_input_opt("timeout", "5000000")` (microseconds)
+- Add timeout option: `.set_format_opt("timeout", "5000000")` (microseconds)
 - Check network connectivity to server.
 - For unstable networks, add reconnect options.
 
