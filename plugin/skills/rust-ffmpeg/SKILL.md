@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: Yeauty
   github: https://github.com/YeautyYE
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 # Rust FFmpeg
@@ -96,14 +96,14 @@ New to Rust FFmpeg? See [quick_start.md](references/quick_start.md) for 5-minute
 
 | Library | Version | FFmpeg | Rust MSRV |
 |---------|---------|--------|-----------|
-| ez-ffmpeg | 0.13.0 | 7.0–8.x | 1.80+ |
+| ez-ffmpeg | 0.13.1 | 7.0–8.x | 1.80+ |
 | ffmpeg-next | 8.1.0 | 7.0–8.x | unspecified |
 | ffmpeg-sys-next | 8.1.0 | 7.0–8.x | unspecified |
 | ffmpeg-sidecar | 2.5.2 | Any | 1.79+ |
 
 **Source**: [crates.io](https://crates.io)
 
-**FFmpeg 7 vs 8**: all four libraries build against both FFmpeg 7 and 8 — **just use the current crate versions above**, no crate-major-to-system-major matching required. `ffmpeg-sys-next` 8.1.0 generates its bindings from the *installed* FFmpeg headers (bindgen) and emits compile-time `ffmpeg_7_0`/`ffmpeg_7_1`/`ffmpeg_8_0`/`ffmpeg_8_1` cfgs for the detected version, so `ffmpeg-next`/`ffmpeg-sys-next` 8.1.0 compile cleanly on FFmpeg **7.0 through 8.x** (libavcodec 61 on FFmpeg 7, 62 on FFmpeg 8); ez-ffmpeg 0.13.0 links either major the same way. You would only pin `7.1.x` for reproducibility on a legacy toolchain — it is **not** required for FFmpeg 7 systems. (The old "pin 7.1.0" advice existed only because rust-ffmpeg 7.1.0 predated FFmpeg 8 support — the now-fixed [#246](https://github.com/zmwangx/rust-ffmpeg/issues/246) EXIF blocker, resolved in 8.0/8.1.) Note: when pulling `ffmpeg-next` **alongside** ez-ffmpeg 0.13, keep it at `8.1.0` to match ez-ffmpeg's re-exported types — a `7.1.0` mixed in collides via the `links = "ffmpeg"` key.
+**FFmpeg 7 vs 8**: all four libraries build against both FFmpeg 7 and 8 — **just use the current crate versions above**, no crate-major-to-system-major matching required. `ffmpeg-sys-next` 8.1.0 generates its bindings from the *installed* FFmpeg headers (bindgen) and emits compile-time `ffmpeg_7_0`/`ffmpeg_7_1`/`ffmpeg_8_0`/`ffmpeg_8_1` cfgs for the detected version, so `ffmpeg-next`/`ffmpeg-sys-next` 8.1.0 compile cleanly on FFmpeg **7.0 through 8.x** (libavcodec 61 on FFmpeg 7, 62 on FFmpeg 8); ez-ffmpeg 0.13.1 links either major the same way. You would only pin `7.1.x` for reproducibility on a legacy toolchain — it is **not** required for FFmpeg 7 systems. (The old "pin 7.1.0" advice existed only because rust-ffmpeg 7.1.0 predated FFmpeg 8 support — the now-fixed [#246](https://github.com/zmwangx/rust-ffmpeg/issues/246) EXIF blocker, resolved in 8.0/8.1.) Note: when pulling `ffmpeg-next` **alongside** ez-ffmpeg 0.13, keep it at `8.1.0` to match ez-ffmpeg's re-exported types — a `7.1.0` mixed in collides via the `links = "ffmpeg"` key.
 
 **Installation Issues**: [installation.md](references/installation.md)
 

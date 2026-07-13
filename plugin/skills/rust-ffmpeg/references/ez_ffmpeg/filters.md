@@ -383,7 +383,7 @@ A complete example showing how to create a custom video filter that tiles the in
 **Prerequisites**: Add dependencies to your `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = "0.13.0"
+ez-ffmpeg = "0.13.1"
 ffmpeg-next = "8.1.0"
 ffmpeg-sys-next = "8.1.0"
 log = "0.4"
@@ -588,7 +588,7 @@ supersedes the deprecated OpenGL filter.
 Enable the feature and add `bytemuck` (for `#[derive(Pod)]` on param structs):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.13.0", features = ["wgpu"] }
+ez-ffmpeg = { version = "0.13.1", features = ["wgpu"] }
 bytemuck = { version = "1.8", features = ["derive"] }
 env_logger = "0.11"
 ```

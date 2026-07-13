@@ -49,7 +49,7 @@ in-memory subtitle content (e.g. ASR output).
 Enable the feature in `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.13.0", features = ["subtitle"] }
+ez-ffmpeg = { version = "0.13.1", features = ["subtitle"] }
 ```
 
 ```rust
