@@ -332,6 +332,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+> **Speed tip — mid-video thumbnails**: when grabbing a frame at time T (not the first frame), use `Input::from(&input).set_start_time_us(t_us).set_video_codec_opt("skip_frame", "nokey")` so each task decodes only keyframes instead of the whole keyframe→target pre-roll — the speedup grows with GOP length and resolution. Trade-off: the frame snaps to the first keyframe at/after T, and a T inside the file's last GOP fails with an encoder error. See [ez_ffmpeg/video.md](../ez_ffmpeg/video.md#thumbnail-extraction).
+
 ## Concurrency Guidelines
 
 | Task Type | Recommended Concurrency | Reason |

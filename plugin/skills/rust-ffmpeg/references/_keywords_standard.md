@@ -85,7 +85,7 @@ Internal reference for maintaining consistent Detection Keywords across the skil
 | subtitles.md | subtitles, srt, ass, vtt, burn subtitles, embed subtitles, native burn-in, without libass | captions, subs |
 | debugging.md | detect black frames, silence detect, scene detect, cropdetect, EBU R128, LUFS, measure loudness, content analysis, QC | blackdetect, silencedetect |
 | gif_creation.md | animated gif, gif recipe, palettegen, gif loop, gif dither | gif, video to gif |
-| image_sequences.md | thumbnail recipe, sprite sheet, storyboard, contact sheet, frame extraction | thumbnails, tiles |
+| image_sequences.md | thumbnail recipe, fast thumbnail, sprite sheet, storyboard, contact sheet, frame extraction | thumbnails, tiles, skip_frame=nokey |
 
 ## Validation Rules
 

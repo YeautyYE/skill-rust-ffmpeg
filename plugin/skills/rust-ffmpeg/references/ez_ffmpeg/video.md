@@ -217,7 +217,27 @@ FfmpegContext::builder()
     .output(Output::from("thumb_small.jpg")
         .set_max_video_frames(1))
     .build()?.start()?.wait()?;
+
+// Fastest thumbnail — decode keyframes only (skip_frame=nokey)
+// Input seek + keyframe-only decoding skips the "previous keyframe → target"
+// pre-roll: typically only 1-2 keyframes are decoded regardless of GOP length.
+FfmpegContext::builder()
+    .input(Input::from("video.mp4")
+        .set_start_time_us(10_000_000)                // container-level seek near target
+        .set_video_codec_opt("skip_frame", "nokey"))  // decode keyframes only
+    .filter_desc("scale='min(320,iw)':-1")
+    .output(Output::from("thumb_fast.jpg")
+        .set_max_video_frames(1)
+        .set_video_qscale(2))
+    .build()?.start()?.wait()?;
 ```
+
+**`skip_frame=nokey` trade-offs** — use for scrub previews and batch thumbnail grids; keep the default path when the exact frame matters:
+
+- The captured frame snaps forward to the first keyframe **at or after** the requested time (up to one GOP later), not the exact requested frame.
+- If no keyframe exists at or after the requested time (a target inside the file's **last GOP**), the run fails with an encoder error instead of writing an image.
+- Relies on the container seek succeeding (normal for local files); on unseekable inputs the decoder walks keyframes from the file start instead.
+- The speedup grows with GOP length and resolution.
 
 ## Watermark & Overlay
 

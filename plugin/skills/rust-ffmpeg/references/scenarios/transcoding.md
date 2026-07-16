@@ -9,7 +9,8 @@ Quick patterns for video transcoding, format conversion, and content manipulatio
 
 | Scenario | Content |
 |----------|---------|
-| [audio_extraction.md](audio_extraction.md) | First frame, thumbnail, audio extract, metadata |
+| [audio_extraction.md](audio_extraction.md) | Audio extract, loudness measure, metadata |
+| [image_sequences.md](image_sequences.md) | Thumbnail (`recipes::thumbnail` + fastest `skip_frame=nokey` notes), sprite sheet, frame extraction |
 | [streaming_rtmp_hls.md](streaming_rtmp_hls.md) | Real-time, RTMP, HLS, TCP, device capture |
 | [hardware_acceleration.md](hardware_acceleration.md) | Hardware acceleration, progress monitoring |
 | [batch_processing.md](batch_processing.md) | Batch transcoding, parallel processing |

@@ -41,7 +41,7 @@ If installation constrained → Load [ffmpeg_sidecar.md](references/ffmpeg_sidec
 |---------------|----------------|
 | "convert format", "remux", "trim", "resize", "crop", "simple" | [video_transcoding.md](references/scenarios/video_transcoding.md) |
 | "extract audio", "audio only", "audio track", "mp3 extract", "loudnorm", "normalize audio", "volume" | [audio_extraction.md](references/scenarios/audio_extraction.md) |
-| "thumbnail", "first frame", "multi-output", "concat", "watermark", "pipeline", "filter graph" | [transcoding.md](references/scenarios/transcoding.md) — for a one-shot thumbnail prefer `recipes::thumbnail` in [image_sequences.md](references/scenarios/image_sequences.md) |
+| "thumbnail", "first frame", "fast thumbnail", "skip_frame", "nokey", "keyframe-only", "multi-output", "concat", "watermark", "pipeline", "filter graph" | [transcoding.md](references/scenarios/transcoding.md) — for a one-shot thumbnail prefer `recipes::thumbnail` in [image_sequences.md](references/scenarios/image_sequences.md); for the fastest keyframe-only path (`skip_frame=nokey`, snaps to next keyframe) see [ez_ffmpeg/video.md](references/ez_ffmpeg/video.md#thumbnail-extraction) |
 | "real-time", "RTMP", "HLS", "live", "stream", "capture", "webcam", "buffer", "backpressure", "jitter buffer", "network jitter", "ABR ladder", "HLS ladder", "adaptive bitrate", "master playlist", "VOD packaging" | [streaming_rtmp_hls.md](references/scenarios/streaming_rtmp_hls.md) |
 | "GPU", "NVENC", "VideoToolbox", "hardware", "VAAPI", "QSV", "wgpu", "WGSL", "custom shader", "GPU filter", "compute shader", "libplacebo", "beauty filter", "chroma key", "green screen" | [hardware_acceleration.md](references/scenarios/hardware_acceleration.md) |
 | "batch", "multiple files", "bulk", "parallel" | [batch_processing.md](references/scenarios/batch_processing.md) |
@@ -105,7 +105,7 @@ New to Rust FFmpeg? See [quick_start.md](references/quick_start.md) for 5-minute
 
 **FFmpeg 7 vs 8**: all four libraries build against both FFmpeg 7 and 8 — **just use the current crate versions above**, no crate-major-to-system-major matching required. `ffmpeg-sys-next` 8.1.0 generates its bindings from the *installed* FFmpeg headers (bindgen) and emits compile-time `ffmpeg_7_0`/`ffmpeg_7_1`/`ffmpeg_8_0`/`ffmpeg_8_1` cfgs for the detected version, so `ffmpeg-next`/`ffmpeg-sys-next` 8.1.0 compile cleanly on FFmpeg **7.0 through 8.x** (libavcodec 61 on FFmpeg 7, 62 on FFmpeg 8); ez-ffmpeg 0.13.1 links either major the same way. You would only pin `7.1.x` for reproducibility on a legacy toolchain — it is **not** required for FFmpeg 7 systems. (The old "pin 7.1.0" advice existed only because rust-ffmpeg 7.1.0 predated FFmpeg 8 support — the now-fixed [#246](https://github.com/zmwangx/rust-ffmpeg/issues/246) EXIF blocker, resolved in 8.0/8.1.) Note: when pulling `ffmpeg-next` **alongside** ez-ffmpeg 0.13, keep it at `8.1.0` to match ez-ffmpeg's re-exported types — a `7.1.0` mixed in collides via the `links = "ffmpeg"` key.
 
-**Installation Issues**: [installation.md](references/installation.md)
+**Installation Issues**: [installation.md](references/installation.md) — includes the Windows vcpkg static-link `unresolved external symbol` fix (extra system libs in your app's `build.rs`; `VCPKG_ROOT` must be set in the shell, not via `std::env::set_var` in `build.rs`)
 
 ## Guidelines for Claude
 

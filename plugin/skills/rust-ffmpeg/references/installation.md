@@ -1,7 +1,7 @@
 # FFmpeg Installation Guide
 
 **Detection Keywords**: install ffmpeg, setup, compilation, linking error, library not found, build from source, vcpkg, homebrew
-**Aliases**: installation, setup guide, dependency, linking
+**Aliases**: installation, setup guide, dependency, linking, unresolved external symbol
 
 Comprehensive platform-specific installation for FFmpeg library development in Rust.
 
@@ -188,6 +188,29 @@ Add `C:\msys64\mingw64\bin` to PATH.
 **DLL not found at runtime**: Copy DLLs to executable directory or use static linking
 
 **Binary size too large**: Use `strip = true` and `opt-level = "z"` in `[profile.release]`
+
+**Static linking fails with `unresolved external symbol` errors** (`BCrypt*`, `MF*`, DirectShow, ...): `ffmpeg-sys-next`'s vcpkg path emits only a handful of Windows system libraries ([rust-ffmpeg-sys#28](https://github.com/zmwangx/rust-ffmpeg-sys/issues/28)), so the final link of your application can miss many system libs. Declare the missing libraries in **your own project's** `build.rs`:
+
+```rust
+// build.rs of your application
+fn main() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        for lib in [
+            "user32", "kernel32", "gdi32", "shell32", "ole32", "oleaut32",
+            "uuid", "advapi32", "bcrypt", "ws2_32", "winmm", "crypt32",
+            "secur32", "strmiids", "mfplat", "mfuuid", "mf", "mfreadwrite",
+            "dxgi", "d3d11", "quartz", "comdlg32", "winspool", "version",
+            "setupapi", "shlwapi", "ncrypt", "vfw32",
+        ] {
+            println!("cargo:rustc-link-lib={}", lib);
+        }
+    }
+}
+```
+
+- Set `VCPKG_ROOT` in your **shell** before building — calling `std::env::set_var` inside `build.rs` does not work: `ffmpeg-sys-next`'s build script runs as a separate process and never sees those variables.
+- The exact list depends on the vcpkg FFmpeg port version and its enabled features (the list above is the union reported in [ez-ffmpeg#16](https://github.com/YeautyYE/ez-ffmpeg/issues/16)); your set may differ.
+- Dynamic linking (`vcpkg install ffmpeg`) is not affected.
 
 ---
 
