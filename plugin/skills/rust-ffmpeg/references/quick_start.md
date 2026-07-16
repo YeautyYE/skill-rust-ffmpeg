@@ -178,7 +178,7 @@ ffmpeg-sidecar = "2.5.2"
 |------|-----------------|-------|
 | Convert video format | ez-ffmpeg, ffmpeg-next, ffmpeg-sidecar | [video_transcoding.md](scenarios/video_transcoding.md) |
 | Extract audio | ez-ffmpeg, ffmpeg-next, ffmpeg-sidecar | [audio_extraction.md](scenarios/audio_extraction.md) |
-| Generate thumbnails | ez-ffmpeg, ffmpeg-next, ffmpeg-sidecar | [video_transcoding.md](scenarios/video_transcoding.md) |
+| Generate thumbnails | ez-ffmpeg, ffmpeg-next, ffmpeg-sidecar | [image_sequences.md](scenarios/image_sequences.md) |
 | Stream to RTMP | ez-ffmpeg, ffmpeg-next, ffmpeg-sidecar | [streaming_rtmp_hls.md](scenarios/streaming_rtmp_hls.md) |
 | Hardware encoding | All libraries | [hardware_acceleration.md](scenarios/hardware_acceleration.md) |
 | Batch processing | ez-ffmpeg, ffmpeg-next, ffmpeg-sidecar | [batch_processing.md](scenarios/batch_processing.md) |
