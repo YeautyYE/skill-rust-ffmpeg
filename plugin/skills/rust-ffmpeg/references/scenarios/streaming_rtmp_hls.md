@@ -122,6 +122,7 @@ Key knobs:
 - **`.segment_duration(secs)`** must be an integer multiple of the GOP length (default GOP == segment duration; override with `.gop_seconds(secs)`).
 - **`.video_codec("libx264")` / `.audio_codec("aac")` / `.audio_bitrate("128k")`** set the encoders and audio rate.
 - **`.rendition_named(Rendition::new(w, h, "5000k").with_name("hd"))`** appends a rendition with a custom directory/variant name; **`.codecs("avc1.640028,mp4a.40.2")`** sets the master `CODECS` attribute.
+- **`.segment_type(HlsSegmentType::Fmp4)`** (0.14) switches the whole ladder from MPEG-TS to fragmented-MP4 segments — each rendition gets an `init.mp4` + `.m4s` media segments referenced via `EXT-X-MAP`, and the master bumps to `#EXT-X-VERSION:7`. Default is `HlsSegmentType::MpegTs` (byte-identical to pre-0.14 `.ts` output). Import both `HlsLadder` and `HlsSegmentType` from `ez_ffmpeg::recipes`.
 - **`.build_context()`** returns the underlying `FfmpegContext` if you want to drive the scheduler yourself instead of calling `.run()`.
 
 **MVP scope**: CFR VOD only — a single video stream plus a single optional audio track. No live/event playlists, audio groups, or encryption (use the manual HLS patterns above for those).

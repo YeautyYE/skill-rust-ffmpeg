@@ -169,7 +169,7 @@ $env:VCPKGRS_DYNAMIC = "0"  # Force static linking
 **Cargo.toml**:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.13.1", features = ["static"] }
+ez-ffmpeg = { version = "0.14.0", features = ["static"] }
 # OR
 ffmpeg-next = { version = "8.1.0", features = ["static"] }
 ```
@@ -307,14 +307,14 @@ jobs:
 # Check FFmpeg version
 ffmpeg -version  # Should show 7.x or 8.x
 
-# Check library versions (ez-ffmpeg 0.13 supports both majors)
+# Check library versions (ez-ffmpeg 0.14 supports both majors)
 pkg-config --modversion libavcodec   # 61.x for FFmpeg 7 / 62.x for FFmpeg 8
 pkg-config --modversion libavformat  # 61.x / 62.x
 pkg-config --modversion libavutil    # 59.x / 60.x
 
 # Test build
 cargo new --bin ffmpeg_test && cd ffmpeg_test
-echo 'ez-ffmpeg = "0.13.1"' >> Cargo.toml
+echo 'ez-ffmpeg = "0.14.0"' >> Cargo.toml
 cargo build --release
 ```
 
@@ -330,7 +330,7 @@ vcpkg integrate install
 # Test build (pkg-config/ffmpeg CLI may not be available)
 cargo new --bin ffmpeg_test
 cd ffmpeg_test
-Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.13.1", features = ["static"] }'
+Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.14.0", features = ["static"] }'
 cargo build --release
 ```
 
@@ -342,7 +342,7 @@ cargo build --release
 
 | Library | Version | FFmpeg Required | libavcodec Version |
 |---------|---------|-----------------|-------------------|
-| ez-ffmpeg | 0.13.1 | 7.0 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
+| ez-ffmpeg | 0.14.0 | 7.1 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
 | ffmpeg-next / -sys-next | 8.1.0 (current) | 7.0 – 8.x | 61.x / 62.x (auto-detected) |
 | ffmpeg-next / -sys-next | 7.1.x (legacy) | 4.x – 7.1 | ≤ 61.x |
 | ffmpeg-next / -sys-next | 6.x (legacy) | ≤ 6.x | ≤ 60.x |
@@ -363,7 +363,7 @@ When system FFmpeg installation is impossible (restricted environments, no admin
 ffmpeg-next = { version = "8.1.0", features = ["build"] }
 
 # ez-ffmpeg has NO `build` feature — enable source build via the sys crate:
-ez-ffmpeg = { version = "0.13.1" }
+ez-ffmpeg = { version = "0.14.0" }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 
 # With GPL codecs (x264, x265)

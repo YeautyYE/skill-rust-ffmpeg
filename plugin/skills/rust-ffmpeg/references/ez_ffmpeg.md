@@ -3,17 +3,18 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.13.1 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.14.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
 
+**New in 0.14** (experimental): in-memory frame/sample export (`frame_export::{FrameExtractor, SampleExtractor}` — decode to packed RGB / `f32` PCM for AI/CV/ASR), frame push (`VideoWriter` — render frames in Rust and encode/mux/stream them, no demuxer), muxer & output-protocol capability probes (`capabilities::{is_muxer_available, is_output_protocol_available}`), WHIP WebRTC output (FFmpeg 8+) and SRT output, fMP4 HLS segments (`HlsLadder::segment_type(HlsSegmentType::Fmp4)`), and named-encoder unavailable-codec errors. See [frame_io.md](ez_ffmpeg/frame_io.md) and [streaming.md](ez_ffmpeg/streaming.md).
 **New in 0.13**: `-shortest` support (`set_shortest`), forced keyframes at exact times (`set_force_key_frames`), bitstream filters (`set_video/audio/subtitle_bsf`), matroska attachments (fonts/cover art), graph-level `sws/swr` opts, `find_stream_info` toggle + per-stream probe/decoder codec opts, built-in GPU effect catalog (`wgpu_filter::effects` — 13 effects), YUV-passthrough WGSL mode, in-place frame mutation helpers (`make_frame_writable`).
 **Breaking in 0.13**: `stop()` returns `Result<()>` (worker panics surface as `Error::WorkerPanicked`); `FrameFilter` hooks take `&mut FrameFilterContext` and return boxed `FrameFilterError` instead of `String`; builder setters are infallible — validation moved to `build()` (`OpenInputError/OpenOutputError::InvalidOption`); `set_framerate(num, den)` replaces the `AVRational` form; `set_audio_sample_fmt("s16")` takes a name string; `set_input_opt(s)` deprecated → `set_format_opt(s)`; `StreamInfo`/`VSyncMethod` are `#[non_exhaustive]` (matches need `..`).
 
 ## Prerequisites
 
-- **FFmpeg**: 7.0 through 8.x installed on system — one build links either major (see [installation.md](installation.md) for platform-specific setup)
-- **Rust**: 1.80+ (MSRV)
+- **FFmpeg**: 7.1 through 8.x installed on system — one build links either major (see [installation.md](installation.md) for platform-specific setup)
+- **Rust**: 1.80+ (MSRV); the optional `wgpu` GPU-filter feature needs 1.85+ (wgpu 26 stack)
 
 ## Table of Contents
 
@@ -237,6 +238,7 @@ FfmpegContext::builder()
 | Media Query | [query.md](ez_ffmpeg/query.md) | Duration, metadata, codecs, devices |
 | Filters | [filters.md](ez_ffmpeg/filters.md) | Built-in filters, custom FrameFilter, wgpu GPU filters (OpenGL deprecated) |
 | Advanced | [advanced.md](ez_ffmpeg/advanced.md) | Hardware accel, custom I/O, frame pipelines |
+| Frame I/O (experimental) | [frame_io.md](ez_ffmpeg/frame_io.md) | In-memory frame/sample export (AI/CV/ASR) + VideoWriter frame push |
 
 ## Installation
 
@@ -246,7 +248,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.13.1", features = ["async"] }
+ez-ffmpeg = { version = "0.14.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -257,11 +259,11 @@ ez-ffmpeg = { version = "0.13.1", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.13.1", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.14.0", features = ["async", "static"] }
 
 # Build FFmpeg from source (last resort when system FFmpeg unavailable).
 # ez-ffmpeg has NO `build` feature — enable it through the underlying sys crate:
-ez-ffmpeg = { version = "0.13.1", features = ["async"] }
+ez-ffmpeg = { version = "0.14.0", features = ["async"] }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 ```
 
@@ -279,4 +281,4 @@ ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 | `static` | Static linking (Windows) |
 | `opengl` | GPU filters — **deprecated since 0.11.0, use `wgpu`** |
 
-> `analysis` (detection/measurement) and `recipes` (thumbnail/gif/HLS ladder) need **no** feature flag — they are in the default build.
+> `analysis` (detection/measurement), `recipes` (thumbnail/gif/HLS ladder), and the experimental `frame_export` / `VideoWriter` (frame push) need **no** feature flag — they are in the default build.

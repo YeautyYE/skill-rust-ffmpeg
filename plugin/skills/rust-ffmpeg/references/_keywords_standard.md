@@ -34,7 +34,8 @@ Internal reference for maintaining consistent Detection Keywords across the skil
 | scenarios/subtitles.md | native subtitle burn-in, SubtitleFilter, pure-Rust subtitle, no libass | hardsub, force_style |
 | scenarios/debugging.md + scenarios/audio_extraction.md | detection, measurement, blackdetect, silencedetect, EBU R128, Analysis runner | QC, loudness measure |
 | scenarios/image_sequences.md + gif_creation.md + streaming_rtmp_hls.md | thumbnail, sprite sheet, animated gif, HLS ABR ladder, one-shot recipe | HlsLadder, storyboard |
-| streaming_rtmp_hls.md | RTMP output, HLS output, live streaming output | stream to, broadcast |
+| streaming_rtmp_hls.md | RTMP output, HLS output, live streaming output, WHIP, SRT, WebRTC, capability probe, fMP4 | stream to, broadcast |
+| ez_ffmpeg/frame_io.md | frame export, extract frames to memory, decode to RGB, whisper PCM, VideoWriter, frames to video, in-memory mp4 | FrameExtractor, SampleExtractor, frame push |
 | frame_filter.md | custom filter, frame processing, pixel manipulation, rust callback | FrameFilter trait |
 | async_processing.md | async ffmpeg, tokio integration, non-blocking, concurrent | async, await |
 | device_enumeration.md | list devices, available cameras, input devices | webcam list, mic list |

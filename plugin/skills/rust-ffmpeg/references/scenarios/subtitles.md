@@ -43,13 +43,13 @@ FfmpegCommand::new()
 **Native burn-in with `SubtitleFilter` (preferred, ez-ffmpeg)** — a pure-Rust
 renderer runs inside the frame pipeline, so this needs **no `--enable-libass`
 FFmpeg build flag, no system libass, and no temporary subtitle files**. It works
-with any FFmpeg build configuration in the supported 7.0–8.x range and accepts
+with any FFmpeg build configuration in the supported 7.1–8.x range and accepts
 in-memory subtitle content (e.g. ASR output).
 
 Enable the feature in `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.13.1", features = ["subtitle"] }
+ez-ffmpeg = { version = "0.14.0", features = ["subtitle"] }
 ```
 
 ```rust

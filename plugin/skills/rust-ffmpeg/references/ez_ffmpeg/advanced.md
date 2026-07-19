@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-- ez-ffmpeg 0.13.1+ with FFmpeg 7.0–8.x
+- ez-ffmpeg 0.14.0+ with FFmpeg 7.1–8.x
 - For hardware acceleration: GPU drivers and codec support
   - macOS: VideoToolbox (built-in)
   - Linux: VAAPI/NVENC drivers

@@ -1,6 +1,6 @@
 # ez-ffmpeg: Streaming
 
-**Detection Keywords**: rtmp server, stream output, hls output, live streaming, rtmp push, stream publish
+**Detection Keywords**: rtmp server, stream output, hls output, live streaming, rtmp push, stream publish, whip, webrtc, srt, capability probe
 **Aliases**: streaming output, live stream, rtmp embed
 
 ## Table of Contents
@@ -18,6 +18,8 @@
 - [Low-Latency Streaming Tips](#low-latency-streaming-tips)
 - [Hardware-Accelerated Streaming](#hardware-accelerated-streaming)
 - [Timestamp Preservation for Re-streaming](#timestamp-preservation-for-re-streaming)
+- [Capability Probes](#capability-probes)
+- [WHIP Output (WebRTC)](#whip-output-webrtc-ffmpeg-8)
 - [SRT Streaming](#srt-streaming)
 - [Async Streaming (with tokio)](#async-streaming-with-tokio)
 - [Troubleshooting](#troubleshooting)
@@ -325,7 +327,88 @@ FfmpegContext::builder()
     .build()?.start()?.wait()?;
 ```
 
+## Capability Probes
+
+Whether a streaming output works depends on the FFmpeg build your process **links
+against**, not on ez-ffmpeg itself. The `capabilities` module (new in 0.14) probes
+the linked build up front, so unsupported setups fail with a clear message instead
+of a mid-pipeline failure:
+
+```rust
+use ez_ffmpeg::capabilities;
+
+// Muxers (output formats) and I/O protocols are SEPARATE namespaces.
+let has_whip = capabilities::is_muxer_available("whip");
+let has_srt  = capabilities::is_output_protocol_available("srt");
+```
+
+A `true` result only means the component is compiled into the linked FFmpeg —
+encoders, TLS backends, endpoint compatibility, and network reachability are all
+separate concerns.
+
+## WHIP Output (WebRTC, FFmpeg 8+)
+
+**Experimental.** FFmpeg 8 ships an upstream `whip` muxer that publishes WebRTC
+streams to WHIP endpoints (Twitch/IVS, Cloudflare Stream, LiveKit, MediaMTX). The
+muxer is marked experimental upstream (known Opus-timestamp FIXME) and cannot be
+exercised by ez-ffmpeg's own CI — treat this as status + instructions, not a
+verified recipe.
+
+Requirements, all imposed by the upstream muxer:
+- **FFmpeg ≥ 8.0 built with a DTLS-capable TLS backend** (8.0: OpenSSL or Schannel;
+  8.1: also GnuTLS / mbedTLS). Without one, `is_muxer_available("whip")` is `false`.
+- **Video: H.264 with B-frames disabled** (`bf=0`). Baseline / Constrained Baseline
+  is the conservative WebRTC-interop profile. ez-ffmpeg raises the encoder's
+  global-header flag automatically when a muxer requires it.
+- **Audio: Opus at 48 kHz stereo** — the muxer enforces this combination.
+
+Discover the encoders your build offers with `ez_ffmpeg::codec::get_encoders()`
+(H.264 is commonly `libx264` (GPL), `libopenh264`, or `h264_nvenc`; Opus is `libopus`).
+
+```rust
+use ez_ffmpeg::{capabilities, FfmpegContext, FfmpegScheduler, Input, Output};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if !capabilities::is_muxer_available("whip") {
+        return Err("this FFmpeg build has no 'whip' muxer \
+                    (needs FFmpeg >= 8.0 with a DTLS backend)".into());
+    }
+
+    let input = Input::from("input.mp4").set_readrate(1.0); // pace file to real time
+
+    let output = Output::from("https://example.com/whip/endpoint")
+        .set_format("whip")                          // required: never guessed from URL
+        .set_format_opt("authorization", "<token>")  // raw token; FFmpeg adds "Bearer "
+        .set_video_codec("libx264")                  // pick from codec::get_encoders()
+        .set_video_codec_opt("profile", "baseline")
+        .set_video_codec_opt("bf", "0")              // WHIP: no B-frames
+        .set_audio_codec("libopus")
+        .set_audio_sample_rate(48000)                // muxer requires 48 kHz stereo Opus
+        .set_audio_channels(2);
+
+    FfmpegScheduler::new(FfmpegContext::builder().input(input).output(output).build()?)
+        .start()?
+        .wait()?;
+    Ok(())
+}
+```
+
 ## SRT Streaming
+
+SRT output needs **two** independent components in the linked build: the `srt`
+**protocol** (`--enable-libsrt`) for transport, plus a container muxer (MPEG-TS
+below) for the payload. Probe both:
+
+```rust
+use ez_ffmpeg::capabilities;
+
+let srt_ready = capabilities::is_output_protocol_available("srt")
+    && capabilities::is_muxer_available("mpegts");
+```
+
+> **Never probe SRT with `is_muxer_available("srt")`.** That name matches the SubRip
+> **subtitle** muxer (present in nearly every FFmpeg build), so it returns `true`
+> whether or not the SRT transport exists — it tells you nothing about SRT streaming.
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input, Output};
@@ -357,7 +440,7 @@ For async operations, enable the `async` feature and use `.await`:
 > **Dependencies**:
 > ```toml
 > [dependencies]
-> ez-ffmpeg = { version = "0.13.1", features = ["async"] }
+> ez-ffmpeg = { version = "0.14.0", features = ["async"] }
 > tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 > ```
 
