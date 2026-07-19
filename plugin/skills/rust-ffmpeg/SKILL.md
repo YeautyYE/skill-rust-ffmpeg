@@ -5,7 +5,6 @@ license: MIT
 metadata:
   author: Yeauty
   github: https://github.com/YeautyYE
-  version: "1.3.0"
 ---
 
 # Rust FFmpeg

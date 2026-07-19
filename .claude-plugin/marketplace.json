@@ -10,7 +10,6 @@
   "plugins": [
     {
       "name": "rust-ffmpeg",
-      "version": "1.3.0",
       "source": "./plugin",
       "description": "Rust FFmpeg development guide - library selection, code generation, and problem solving for video/audio processing"
     }
