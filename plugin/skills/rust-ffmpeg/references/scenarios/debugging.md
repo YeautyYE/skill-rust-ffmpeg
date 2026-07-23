@@ -527,6 +527,9 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 ```
+
+**Capturing payload bytes** (0.15+): `PacketScanner` stays copy-free by default (metadata only). Call `scanner.set_capture_data(true)` before scanning to have each `PacketInfo::data() -> Option<&[u8]>` carry the packet's payload — useful for content-level checks like verifying NAL layout without a second decode pass. Off by default, so existing metadata-only scans are unaffected.
+
 **See also**: [ez_ffmpeg/query.md](../ez_ffmpeg/query.md)
 
 **Using ffmpeg-next** (for more control):

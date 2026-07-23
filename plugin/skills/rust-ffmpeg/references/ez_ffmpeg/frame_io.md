@@ -56,6 +56,35 @@ fn main() -> Result<(), ez_ffmpeg::error::Error> {
 | `.duration_hint_us(i64)` | Total duration for `UniformN` when it can't be probed (live/piped input) |
 | `.video_stream_index(usize)` | Pick a stream when the file has several video streams |
 | `.channel_capacity(usize)` | Bounded decode-ahead queue depth |
+| `.conversion_precision(ConversionPrecision)` | Resize/pixel-format conversion quality tier — see below (default `Standard`, 0.15+) |
+
+### Conversion precision (CLI-matching by default, 0.15+)
+
+`ConversionPrecision` (`ez_ffmpeg::frame_export::ConversionPrecision`) picks the
+swscale flags behind the resize + pixel-format conversion — it never changes
+color interpretation (matrix/range handling is identical in both tiers, see
+[Color policy](#color-policy-tag-aware-by-default) below).
+
+| Variant | swscale flags | Behavior |
+|---------|---------------|----------|
+| `Standard` *(default)* | `bicubic` | Matches the FFmpeg CLI's own default conversion path — same bytes as an equivalent `ffmpeg -vf "scale=..,format=.."` run, same throughput class |
+| `High` | `bicubic+accurate_rnd+full_chroma_int` | Accurate rounding + full chroma interpolation; disables swscale's unscaled fast-path converters (several-fold slower — at 1080p the conversion, not the decode, becomes the bottleneck) |
+
+> **Migrating from 0.14.0**: that release always ran with the `High`-equivalent
+> flags — there was no precision knob. Code that calls `FrameExtractor` with no
+> `.conversion_precision(..)` now gets `Standard` by default and produces
+> **different bytes** on chroma edges/rounded values than 0.14.0 did. Add
+> `.conversion_precision(ConversionPrecision::High)` to reproduce 0.14.0 output
+> byte-for-byte (when linked against the same libswscale build).
+
+```rust
+use ez_ffmpeg::frame_export::{ConversionPrecision, FrameExtractor, PixelLayout};
+
+let frames = FrameExtractor::new("input.mp4")
+    .pixel(PixelLayout::Rgb24)
+    .conversion_precision(ConversionPrecision::High)  // pre-0.15 byte-identical output
+    .collect_frames()?;
+```
 
 **`Sampling` modes:**
 

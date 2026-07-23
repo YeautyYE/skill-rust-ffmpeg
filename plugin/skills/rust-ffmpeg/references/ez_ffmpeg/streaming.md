@@ -9,6 +9,7 @@
 - [Embedded High-Concurrency RTMP Server](#embedded-high-concurrency-rtmp-server)
   - [StreamBuilder API](#streambuilder-api)
   - [Traditional API (Full Control)](#traditional-api-full-control)
+  - [Server Lifecycle & Clone Semantics](#server-lifecycle--clone-semantics-015)
   - [External RTMP Server](#external-rtmp-server-no-rtmp-feature-needed)
 - [RTMP Streaming](#rtmp-streaming)
 - [Multi-Source Streaming](#multi-source-streaming)
@@ -87,6 +88,34 @@ FfmpegContext::builder()
     .output(output)
     .build()?.start()?.wait()?;
 ```
+
+### Server Lifecycle & Clone Semantics (0.15+)
+
+`EmbedRtmpServer` is `Clone` — clones share **one** underlying lifecycle, not
+independent servers. As of 0.15, that lifecycle can be started only once:
+
+```rust
+let first = EmbedRtmpServer::new("127.0.0.1:1935");
+let second = first.clone();
+
+let running = first.start()?;         // the family's first start wins
+let err = second.start().unwrap_err(); // any later attempt is refused...
+// ...even a sibling clone taken before start(), and even AFTER running.stop()
+// matches Error::RtmpServerAlreadyStarted
+```
+
+The advisory check runs **before** the socket bind, so a fixed-port retry via
+a stale clone gets the typed `RtmpServerAlreadyStarted` instead of a raw
+`AddrInUse`. A `start()` that fails *before* claiming the lifecycle (e.g. the
+bind itself failing) leaves it untouched, so a clone may still retry — once
+claimed, a failing `start()` ends the lifecycle for good.
+
+`create_rtmp_input()` / `create_stream_sender()` can fail with
+`Error::RtmpRegistrationQueueFull` if 1024+ stream registrations are already
+waiting for the reactor to drain them — a fixed internal bound, not
+configurable. This replaces a blocking-hang risk from earlier versions with a
+fast, typed error under extreme registration backlogs; ordinary usage (a
+handful of concurrent publishers) never approaches it.
 
 ### External RTMP Server (No `rtmp` feature needed)
 
@@ -440,7 +469,7 @@ For async operations, enable the `async` feature and use `.await`:
 > **Dependencies**:
 > ```toml
 > [dependencies]
-> ez-ffmpeg = { version = "0.14.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.15.0", features = ["async"] }
 > tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 > ```
 
@@ -512,6 +541,18 @@ Error: Address already in use
 - Verify OBS/encoder is pushing to correct URL: `rtmp://localhost:1935/app_name/stream_key`
 - Check app name and stream key match `create_rtmp_input()` parameters.
 - Ensure encoder starts before calling `create_rtmp_input()`.
+
+**`Error::RtmpServerAlreadyStarted`** (0.15+):
+- You called `.start()` on more than one clone of the same `EmbedRtmpServer`,
+  or called it again after `.stop()`. Clones share one lifecycle — keep a
+  single `start()` call per server family. See
+  [Server Lifecycle & Clone Semantics](#server-lifecycle--clone-semantics-015).
+
+**`Error::RtmpRegistrationQueueFull`** (0.15+):
+- 1024+ stream registrations are already waiting on the reactor. Check for a
+  registration leak (calling `create_rtmp_input`/`create_stream_sender`
+  without the corresponding FFmpeg job ever starting/finishing) rather than
+  raising the bound — it isn't configurable.
 
 ### Hardware Acceleration Issues
 

@@ -3,10 +3,11 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.14.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.15.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
 
+**New in 0.15**: encoded packet export (`packet_sink::PacketSink` — H.264/AAC access units straight from the encoder, WebCodecs-ready avcC/AudioSpecificConfig, no container; experimental, strict libx264/AAC-only tier), CLI command translation (`cli` feature: `from_cli_args`/`emit_rust_code` run or translate a narrow, golden-tested command subset — 6 verified shapes; execution additionally gated on a verified FFmpeg runtime profile, FFmpeg 7.1 only today), per-output simple video filter (`Output::set_video_filter`, distinct from context-level `filter_desc`), `FrameExtractor` conversion-precision tiers (`ConversionPrecision::{Standard, High}` — default now matches the FFmpeg CLI's own swscale flags; `High` reproduces 0.14.0's byte-for-byte output), optional packet-payload capture (`PacketScanner::set_capture_data`), and RTMP embedded-server lifecycle hardening (`Error::RtmpServerAlreadyStarted` when a cloned server handle is started twice, `RtmpRegistrationQueueFull` under an extreme registration backlog). See [packet_sink.md](ez_ffmpeg/packet_sink.md), [cli_compat.md](ez_ffmpeg/cli_compat.md), [filters.md](ez_ffmpeg/filters.md#per-output-simple-video-filter-set_video_filter-015), and [frame_io.md](ez_ffmpeg/frame_io.md).
 **New in 0.14** (experimental): in-memory frame/sample export (`frame_export::{FrameExtractor, SampleExtractor}` — decode to packed RGB / `f32` PCM for AI/CV/ASR), frame push (`VideoWriter` — render frames in Rust and encode/mux/stream them, no demuxer), muxer & output-protocol capability probes (`capabilities::{is_muxer_available, is_output_protocol_available}`), WHIP WebRTC output (FFmpeg 8+) and SRT output, fMP4 HLS segments (`HlsLadder::segment_type(HlsSegmentType::Fmp4)`), and named-encoder unavailable-codec errors. See [frame_io.md](ez_ffmpeg/frame_io.md) and [streaming.md](ez_ffmpeg/streaming.md).
 **New in 0.13**: `-shortest` support (`set_shortest`), forced keyframes at exact times (`set_force_key_frames`), bitstream filters (`set_video/audio/subtitle_bsf`), matroska attachments (fonts/cover art), graph-level `sws/swr` opts, `find_stream_info` toggle + per-stream probe/decoder codec opts, built-in GPU effect catalog (`wgpu_filter::effects` — 13 effects), YUV-passthrough WGSL mode, in-place frame mutation helpers (`make_frame_writable`).
 **Breaking in 0.13**: `stop()` returns `Result<()>` (worker panics surface as `Error::WorkerPanicked`); `FrameFilter` hooks take `&mut FrameFilterContext` and return boxed `FrameFilterError` instead of `String`; builder setters are infallible — validation moved to `build()` (`OpenInputError/OpenOutputError::InvalidOption`); `set_framerate(num, den)` replaces the `AVRational` form; `set_audio_sample_fmt("s16")` takes a name string; `set_input_opt(s)` deprecated → `set_format_opt(s)`; `StreamInfo`/`VSyncMethod` are `#[non_exhaustive]` (matches need `..`).
@@ -230,7 +231,8 @@ FfmpegContext::builder()
 
 | Scenario | File | Use Cases |
 |----------|------|-----------|
-| **CLI Migration** | [cli_migration.md](ez_ffmpeg/cli_migration.md) | FFmpeg CLI to Rust conversion, option mapping |
+| **CLI Migration** | [cli_migration.md](ez_ffmpeg/cli_migration.md) | FFmpeg CLI to Rust conversion, option mapping (manual, broad) |
+| **CLI Compat Facade** (0.15) | [cli_compat.md](ez_ffmpeg/cli_compat.md) | Automatic run/translate (`from_cli_args`/`emit_rust_code`) of a narrow, golden-tested command subset |
 | Video Processing | [video.md](ez_ffmpeg/video.md) | Transcoding, clipping, merging, thumbnail, watermark |
 | Audio Processing | [audio.md](ez_ffmpeg/audio.md) | Extraction, conversion, resampling |
 | Streaming | [streaming.md](ez_ffmpeg/streaming.md) | RTMP push, HLS generation, re-streaming |
@@ -239,6 +241,7 @@ FfmpegContext::builder()
 | Filters | [filters.md](ez_ffmpeg/filters.md) | Built-in filters, custom FrameFilter, wgpu GPU filters (OpenGL deprecated) |
 | Advanced | [advanced.md](ez_ffmpeg/advanced.md) | Hardware accel, custom I/O, frame pipelines |
 | Frame I/O (experimental) | [frame_io.md](ez_ffmpeg/frame_io.md) | In-memory frame/sample export (AI/CV/ASR) + VideoWriter frame push |
+| Packet Sink (experimental, 0.15) | [packet_sink.md](ez_ffmpeg/packet_sink.md) | Encoded packet export — WebCodecs H.264/AAC, RTP/SRT packetizing, fMP4 segmenting |
 
 ## Installation
 
@@ -248,7 +251,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.14.0", features = ["async"] }
+ez-ffmpeg = { version = "0.15.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -259,11 +262,11 @@ ez-ffmpeg = { version = "0.14.0", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.14.0", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.15.0", features = ["async", "static"] }
 
 # Build FFmpeg from source (last resort when system FFmpeg unavailable).
 # ez-ffmpeg has NO `build` feature — enable it through the underlying sys crate:
-ez-ffmpeg = { version = "0.14.0", features = ["async"] }
+ez-ffmpeg = { version = "0.15.0", features = ["async"] }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 ```
 

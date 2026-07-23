@@ -19,8 +19,20 @@
 | [video.md](video.md) | Video transcoding, format conversion |
 | [audio.md](audio.md) | Audio extraction and processing |
 | [filters.md](filters.md) | FFmpeg filters (scale, crop, etc.) |
+| [cli_compat.md](cli_compat.md) | Automatic CLI-to-Rust: `cli::from_cli_args`/`cli::emit_rust_code` (0.15+) |
 
 Quick reference for converting FFmpeg CLI commands to ez-ffmpeg Rust code.
+
+> **This page is a hand-written, broad mapping table** — it covers far more
+> CLI surface than any automated tool, including hardware accel, complex
+> filtergraphs, and RTMP/HLS live push. If your command happens to match one
+> of a handful of common shapes (plain transcode, clip, audio extract,
+> thumbnail, `-vf scale=`, single-rendition VOD HLS), ez-ffmpeg 0.15+ can
+> instead translate or run it **automatically** with a versioned correctness
+> guarantee — see [cli_compat.md](cli_compat.md) (`cli` feature,
+> `emit_rust_code`/`from_cli_args`). The two are complementary: reach for the
+> automatic facade first for its narrow verified subset, fall back to the
+> manual tables below for everything else.
 
 ## Core Pattern
 

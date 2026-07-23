@@ -9,6 +9,7 @@
 - [Built-in FFmpeg Filters](#built-in-ffmpeg-filters)
   - [Common Video Filters](#common-video-filters)
   - [Common Audio Filters](#common-audio-filters)
+- [Per-Output Simple Video Filter (set_video_filter, 0.15+)](#per-output-simple-video-filter-set_video_filter-015)
 - [Custom Rust Filters (FrameFilter)](#custom-rust-filters-framefilter)
 - [FrameFilter with Frame Request](#framefilter-with-frame-request)
 - [Frame Sender Filter](#frame-sender-filter)
@@ -106,6 +107,47 @@ FfmpegContext::builder()
 // Channel manipulation
 .filter_desc("pan=mono|c0=0.5*c0+0.5*c1")  // Stereo to mono
 ```
+
+## Per-Output Simple Video Filter (`set_video_filter`, 0.15+)
+
+A second way to attach a filter, scoped to **one output's video stream** —
+the builder analog of the FFmpeg CLI's per-output `-vf`, as distinct from
+`filter_desc()` above (a **context-level** graph, CLI's `-filter_complex`,
+which can span multiple inputs/outputs):
+
+```rust
+use ez_ffmpeg::{FfmpegContext, Output};
+
+// ffmpeg -i input.mp4 -vf scale=1280:-2 -c:a copy resized.mp4
+FfmpegContext::builder()
+    .input("input.mp4")
+    .output(
+        Output::from("resized.mp4")
+            .set_video_filter("scale=1280:-2") // -vf scale=1280:-2
+            .set_audio_codec("copy"),
+    )
+    .build()?.start()?.wait()?;
+```
+
+`.clear_video_filter()` removes a chain set earlier, restoring passthrough.
+Only video is affected — there's no per-output audio-filter (`-af`) equivalent
+yet. `VideoWriter` (see [frame_io.md](frame_io.md)) honors it too.
+
+The chain must be a single connected pipe from one video-in pad to one
+video-out pad; validation runs at `build()`, not at the `set_video_filter()`
+call itself, and fails as one of these `OpenOutputError` variants:
+
+| Trigger | Error |
+|---------|-------|
+| `set_video_filter(..)` combined with `set_video_codec("copy")` (or a copy stream map covering video) | `FilterWithStreamCopy` |
+| This output's video is also fed by a context-level `filter_desc` graph | `SimpleAndComplexFilter` |
+| Chain isn't one connected linear pipe (e.g. `"split"` — 2 output pads; or two disconnected sub-chains) | `SimpleFilterInvalidShape` |
+| Filter configured, but the output ends up with no re-encoded video stream to run it on (audio-only input, `disable_video()`, an optional map matching nothing) | `VideoFilterUnused` |
+| An audio-only chain attached as the (implicitly video) filter, e.g. `set_video_filter("anull")` | `SimpleFilterMediaTypeMismatch` |
+
+A runtime-conditional router like `streamselect` is accepted as long as it's
+*structurally* reachable — the check validates topology, not which branch a
+filter takes at runtime.
 
 ## Custom Rust Filters (FrameFilter)
 
@@ -383,7 +425,7 @@ A complete example showing how to create a custom video filter that tiles the in
 **Prerequisites**: Add dependencies to your `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = "0.14.0"
+ez-ffmpeg = "0.15.0"
 ffmpeg-next = "8.1.0"
 ffmpeg-sys-next = "8.1.0"
 log = "0.4"
@@ -588,7 +630,7 @@ supersedes the deprecated OpenGL filter.
 Enable the feature and add `bytemuck` (for `#[derive(Pod)]` on param structs):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.14.0", features = ["wgpu"] }
+ez-ffmpeg = { version = "0.15.0", features = ["wgpu"] }
 bytemuck = { version = "1.8", features = ["derive"] }
 env_logger = "0.11"
 ```
