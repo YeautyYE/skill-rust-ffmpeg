@@ -9,11 +9,11 @@ Frame allocation, manipulation, video scaling, audio resampling, and encode/deco
 
 - [Related Guides](#related-guides)
 - [Frame Allocation](#frame-allocation)
-- [Video Scaling (swscale)](#video-scaling-swscale)
-- [Audio Resampling (swresample)](#audio-resampling-swresample)
-- [Decode Loop](#decode-loop)
-- [Encode Loop](#encode-loop)
-- [Frame Copy and Reference](#frame-copy-and-reference)
+- [Video Scaling (sws_scale)](#video-scaling-sws_scale)
+- [Audio Resampling (swr_convert)](#audio-resampling-swr_convert)
+- [Decode Workflow](#decode-workflow)
+- [Encode Workflow](#encode-workflow)
+- [Frame Property Operations](#frame-property-operations)
 - [Best Practices](#best-practices)
 
 ## Related Guides

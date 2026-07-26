@@ -11,9 +11,9 @@ Hardware-accelerated encoding and decoding using GPU capabilities.
 - [Hardware Types](#hardware-types)
 - [GPU Detection](#gpu-detection)
 - [Hardware Device Context](#hardware-device-context)
-- [Hardware Frame Transfer](#hardware-frame-transfer)
-- [Platform-Specific Examples](#platform-specific-examples)
-- [Error Handling](#error-handling)
+- [Frame Transfer (GPU ↔ CPU)](#frame-transfer-gpu--cpu)
+- [Platform-Specific Detection](#platform-specific-detection)
+- [Fallback Pattern](#fallback-pattern)
 - [Best Practices](#best-practices)
 
 ## Related Guides

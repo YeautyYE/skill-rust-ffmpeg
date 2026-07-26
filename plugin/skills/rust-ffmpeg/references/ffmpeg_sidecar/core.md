@@ -10,10 +10,10 @@ Complete API reference for ffmpeg-sidecar's three core types: FfmpegCommand, Ffm
 - [Related Guides](#related-guides)
 - [Architecture Overview](#architecture-overview)
 - [FfmpegCommand - Builder API](#ffmpegcommand---builder-api)
-- [FfmpegChild - Process Handle](#ffmpegchild---process-handle)
+- [FfmpegChild - Process Control](#ffmpegchild---process-control)
 - [FfmpegIterator - Event Stream](#ffmpegiterator---event-stream)
 - [Event Types](#event-types)
-- [Error Handling](#error-handling)
+- [Debug and Logging](#debug-and-logging)
 - [Best Practices](#best-practices)
 
 ## Related Guides

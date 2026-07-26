@@ -1,9 +1,9 @@
-# Transcoding Scenarios
+# Multi-Output & Pipeline Scenarios
 
 **Detection Keywords**: multi-output, multiple formats, concat videos, merge videos, watermark, logo overlay, decode encode pipeline, frame processing
 **Aliases**: join, combine, multi-format, overlay, text overlay, transcode pipeline
 
-Quick patterns for video transcoding, format conversion, and content manipulation.
+Patterns that go beyond one-input-one-output conversion: multi-output fan-out, concat, watermarking, and decode→encode pipelines with per-stream handling. For plain format/codec conversion, remux, trim, resize, or crop, see [video_transcoding.md](video_transcoding.md).
 
 ## Related Scenarios
 
@@ -21,31 +21,9 @@ Quick patterns for video transcoding, format conversion, and content manipulatio
 
 ## Quick Start
 
-### Basic Format Conversion
-
-**Using ez-ffmpeg**:
-```rust
-use ez_ffmpeg::FfmpegContext;
-
-FfmpegContext::builder()
-    .input("input.mp4")
-    .output("output.webm")
-    .build()?.start()?.wait()?;
-```
-**See also**: [ez_ffmpeg/video.md](../ez_ffmpeg/video.md)
-
-**Using ffmpeg-sidecar**:
-```rust
-use ffmpeg_sidecar::command::FfmpegCommand;
-
-FfmpegCommand::new()
-    .input("input.mp4")
-    .output("output.webm")
-    .spawn()?.wait()?;
-```
-**See also**: [ffmpeg_sidecar/video.md](../ffmpeg_sidecar/video.md)
-
----
+> Basic one-input-one-output conversion lives in
+> [video_transcoding.md](video_transcoding.md) — this page starts where a
+> single output stops.
 
 ### Multi-Output (Single Input → Multiple Formats)
 

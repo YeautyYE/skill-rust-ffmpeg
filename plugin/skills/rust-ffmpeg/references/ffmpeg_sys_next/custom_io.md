@@ -13,9 +13,9 @@ FFmpeg custom I/O for reading from memory buffers, network streams, or other non
 - [Read Callback](#read-callback)
 - [Write Callback](#write-callback)
 - [Seek Callback](#seek-callback)
-- [Complete Example: Memory Buffer](#complete-example-memory-buffer)
-- [Non-Blocking I/O](#non-blocking-io)
-- [Error Handling](#error-handling)
+- [Complete Memory Buffer Example](#complete-memory-buffer-example)
+- [Non-Blocking Read Pattern](#non-blocking-read-pattern)
+- [Common Pitfalls](#common-pitfalls)
 - [Best Practices](#best-practices)
 
 ## Related Guides

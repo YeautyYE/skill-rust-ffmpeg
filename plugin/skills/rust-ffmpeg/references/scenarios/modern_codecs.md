@@ -18,7 +18,7 @@ Modern video codec support including AV1, AVIF, HDR, and 10-bit processing.
 
 | Scenario | Content |
 |----------|---------|
-| [transcoding.md](transcoding.md) | Standard transcoding patterns |
+| [pipelines_multi_output.md](pipelines_multi_output.md) | Multi-output and pipeline patterns |
 | [hardware_acceleration.md](hardware_acceleration.md) | Hardware acceleration |
 
 ---

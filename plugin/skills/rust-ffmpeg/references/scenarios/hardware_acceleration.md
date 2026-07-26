@@ -13,7 +13,7 @@ Use GPU and hardware encoders for faster video processing across all Rust FFmpeg
 - [Platform-Specific Examples](#platform-specific-examples)
 - [GPU Filter-Backend Probing](#gpu-filter-backend-probing)
 - [Custom GPU Shaders (wgpu)](#custom-gpu-shaders-wgpu)
-- [ffmpeg-next Hardware Transcoding](#ffmpeg-next-hardware-transcoding)
+- [ffmpeg-next Software Transcoding (x264)](#ffmpeg-next-software-transcoding-x264)
 - [ffmpeg-sidecar Hardware Encoding](#ffmpeg-sidecar-hardware-encoding)
 - [Decoder + Encoder Pipeline](#decoder--encoder-pipeline)
 - [When to Use Hardware vs Software](#when-to-use-hardware-vs-software)

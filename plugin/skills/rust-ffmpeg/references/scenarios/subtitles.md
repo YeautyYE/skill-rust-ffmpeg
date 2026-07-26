@@ -9,7 +9,7 @@ Patterns for subtitle extraction, embedding, and burning.
 
 | Scenario | Content |
 |----------|---------|
-| [transcoding.md](transcoding.md) | Video transcoding with subtitle streams |
+| [pipelines_multi_output.md](pipelines_multi_output.md) | Pipelines that carry subtitle streams (stream-copy while re-encoding video) |
 | [audio_extraction.md](audio_extraction.md) | Stream extraction patterns |
 
 ---

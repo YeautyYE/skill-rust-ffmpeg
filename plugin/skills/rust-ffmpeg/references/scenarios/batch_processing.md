@@ -9,10 +9,10 @@ Process multiple media files concurrently using async/parallel execution.
 
 - [Quick Example](#quick-example-30-seconds)
 - [Concurrent Processing Patterns](#concurrent-processing-patterns)
-- [Progress Tracking](#progress-tracking)
-- [Error Handling](#error-handling)
-- [Resource Management](#resource-management)
-- [Sequential Processing](#sequential-processing)
+- [Progress Tracking](#with-progress-tracking)
+- [Bounded Concurrency](#bounded-concurrency-recommended)
+- [Concurrency Guidelines](#concurrency-guidelines)
+- [Library Comparison](#library-comparison)
 
 > **Dependencies**:
 > ```toml
