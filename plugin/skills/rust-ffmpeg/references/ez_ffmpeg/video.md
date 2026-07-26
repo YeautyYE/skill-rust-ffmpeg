@@ -1,12 +1,13 @@
 # ez-ffmpeg: Video Processing
 
-**Detection Keywords**: video transcode, format conversion, resize video, change container, clip video, trim, cut
-**Aliases**: video processing, convert video, video encoding
+**Detection Keywords**: video transcode, format conversion, resize video, change container, clip video, trim, cut, per-stream encoder, StreamMap, different codec per stream
+**Aliases**: video processing, convert video, video encoding, -c:v:0
 
 ## Table of Contents
 
 - [Related Guides](#related-guides)
 - [Transcoding (Format Conversion)](#transcoding-format-conversion)
+- [Per-Stream Encoder Selection (StreamMap)](#per-stream-encoder-selection-streammap)
 - [Video Clipping](#video-clipping)
 - [Video Merging](#video-merging)
 - [Resolution & FPS](#resolution--fps)
@@ -56,6 +57,57 @@ FfmpegContext::builder()
         .set_audio_codec_opt("b", "192k"))
     .build()?.start()?.wait()?;
 ```
+
+## Per-Stream Encoder Selection (StreamMap)
+
+**0.16+**: `set_video_codec`/`set_audio_codec` apply per media *type* — every video
+stream of the output gets the same encoder. To give **same-type streams different
+encoders or options within one output** (the FFmpeg CLI's indexed
+`-c:v:0 libx264 -c:v:1 libx265`, `-b:v:0 4M`), pass a `StreamMap` parameter object to
+`add_stream_map` instead of a plain specifier string:
+
+```rust
+use ez_ffmpeg::{FfmpegContext, Output, StreamMap};
+
+// One MKV holding an H.264 and an H.265 rendition plus per-track audio encoders:
+// -map "[v0]" -c:v:0 libx264 -b:v:0 4M -preset:v:0 slow
+// -map "[v1]" -c:v:1 libx265 -crf:v:1 22
+// -map 0:a:0  -c:a:0 aac     -b:a:0 128k
+// -map 0:a:1  -c:a:1 libopus -b:a:1 96k
+FfmpegContext::builder()
+    .input("input.mp4")
+    .filter_desc("[0:v]split=2[s0][s1];[s0]scale=1920:-2[v0];[s1]scale=1280:-2[v1]")
+    .output(Output::from("out.mkv")
+        .add_stream_map(StreamMap::new("[v0]").codec("libx264")
+            .codec_opt("b", "4M").codec_opt("preset", "slow"))
+        .add_stream_map(StreamMap::new("[v1]").codec("libx265")
+            .codec_opt("crf", "22"))
+        .add_stream_map(StreamMap::new("0:a:0").codec("aac").codec_opt("b", "128k"))
+        .add_stream_map(StreamMap::new("0:a:1").codec("libopus").codec_opt("b", "96k")))
+    .build()?.start()?.wait()?;
+```
+
+**Rules** (FFmpeg CLI parity):
+
+- **Precedence**: per-map `codec()` > per-type `set_video_codec`/`set_audio_codec`/
+  `set_subtitle_codec` > the container's default encoder. `codec_opt()` entries merge
+  **key by key** over the per-type option tables — a per-map key overrides the
+  same-named per-type key; other per-type keys still apply (like the CLI, where
+  `-b:v 4M -preset:v:0 slow` leaves stream `v:0` with both).
+- **Map granularity is binding granularity**: `StreamMap::new("0:a").codec("aac")`
+  re-encodes *every* audio stream of input 0 (like `-c:a aac`). For different encoders
+  per stream, write single-stream maps (`"0:a:0"`, `"0:a:1"`).
+- **`codec("copy")` selects stream copy** for the map (same as
+  `add_stream_map_with_copy`). Combining copy with a different per-map codec or with
+  `codec_opt` entries fails at `build()` with the typed
+  `OpenOutputError::StreamMapCopyConflict` — the CLI merely warns and silently drops
+  such options; ez-ffmpeg refuses.
+- Plain strings keep working unchanged (`add_stream_map("0:v")` — a blanket
+  `From<Into<String>>` conversion), and a codec on a negative/disabling map (`"-0:v"`)
+  is rejected at `build()`.
+- The `cli` compat feature permanently excludes indexed per-stream options
+  (`-c:v:0`), so `StreamMap` is the **only** outlet for differentiated same-type
+  encoding — a CLI command using them must be ported by hand.
 
 ## Video Clipping
 

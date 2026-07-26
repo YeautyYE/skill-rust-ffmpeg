@@ -117,6 +117,31 @@ configurable. This replaces a blocking-hang risk from earlier versions with a
 fast, typed error under extreme registration backlogs; ordinary usage (a
 handful of concurrent publishers) never approaches it.
 
+**`stop()` is fully synchronous (0.16)** — it signals the listening and
+connection threads, then **joins them**, returning only once teardown settled:
+the listener socket is released, every connection closed, every publisher torn
+down with its stream key freed. You can rebind the address or reuse a stream
+key immediately after it returns, no polling. Blocking is bounded but not
+hard-real-time (the reactor finishes its loop turn and may spend a few seconds
+draining tails to peers that stopped reading). Two rules that come with the
+joins:
+
+- **Never call `stop()` from inside a logger implementation, or while holding
+  a lock your logger sink also takes** (e.g. an `Arc<Mutex<_>>` shared between
+  app code and a custom logger). The winding-down server threads log through
+  the global logger during shutdown — blocking in `stop()` while holding a
+  resource that logger needs is a lock inversion. The one reentrant edge the
+  crate can detect (user-logger code on a server thread calling `stop()`)
+  degrades to signal-only instead of deadlocking.
+- An FFmpeg job still pushing into this server via `create_rtmp_input` loses
+  its feed and fails its next write; the server classifies that failure as a
+  deliberate stop rather than an opaque send error. Stop such jobs first if
+  their clean completion matters.
+
+Also in 0.16: idle watchers are pinged before the 60s inactivity timeout would
+reap them (an idle-but-connected viewer no longer gets dropped), and ping
+delivery itself no longer counts as peer liveness.
+
 ### External RTMP Server (No `rtmp` feature needed)
 
 ```rust
@@ -469,7 +494,7 @@ For async operations, enable the `async` feature and use `.await`:
 > **Dependencies**:
 > ```toml
 > [dependencies]
-> ez-ffmpeg = { version = "0.15.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.16.0", features = ["async"] }
 > tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 > ```
 

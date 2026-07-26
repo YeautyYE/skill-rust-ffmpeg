@@ -36,8 +36,11 @@ Internal reference for maintaining consistent Detection Keywords across the skil
 | scenarios/image_sequences.md + gif_creation.md + streaming_rtmp_hls.md | thumbnail, sprite sheet, animated gif, HLS ABR ladder, one-shot recipe | HlsLadder, storyboard |
 | streaming_rtmp_hls.md | RTMP output, HLS output, live streaming output, WHIP, SRT, WebRTC, capability probe, fMP4 | stream to, broadcast |
 | ez_ffmpeg/frame_io.md | frame export, extract frames to memory, decode to RGB, whisper PCM, VideoWriter, frames to video, in-memory mp4 | FrameExtractor, SampleExtractor, frame push |
-| ez_ffmpeg/packet_sink.md | encoded packet export, packet sink, webcodecs, h.264 access units, aac frames, avcC, AudioSpecificConfig | PacketSink, EncodedVideoChunk, rtp packetizer, fmp4 segmenter |
+| ez_ffmpeg/packet_sink.md | encoded packet export, packet sink, webcodecs, h.264 access units, aac frames, avcC, AudioSpecificConfig, job failure summary | PacketSink, EncodedVideoChunk, rtp packetizer, fmp4 segmenter, on_job_failed, JobFailureSummary |
 | ez_ffmpeg/cli_compat.md | run ffmpeg command in rust, translate ffmpeg command, automatic cli conversion, verified shape | from_cli_args, emit_rust_code, cli-compat, cli facade |
+| ez_ffmpeg/advanced.md | typed progress, progress monitoring, progress snapshot, per-output progress | ProgressHandle, progress_handle, percent_of |
+| ez_ffmpeg/video.md | per-stream encoder, different codec per stream, indexed stream options | StreamMap, -c:v:0, per-map codec |
+| scenarios/modern_codecs.md | HDR to SDR, tone mapping, washed out colors, PQ, HLG | tonemap, zscale, libplacebo, color_transfer |
 | frame_filter.md | custom filter, frame processing, pixel manipulation, rust callback | FrameFilter trait |
 | async_processing.md | async ffmpeg, tokio integration, non-blocking, concurrent | async, await |
 | device_enumeration.md | list devices, available cameras, input devices | webcam list, mic list |

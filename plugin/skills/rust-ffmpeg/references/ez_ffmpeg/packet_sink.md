@@ -1,7 +1,7 @@
 # ez-ffmpeg: Encoded Packet Export (Packet Sink)
 
-**Detection Keywords**: encoded packet export, webcodecs, packet sink, h.264 access units, aac frames, encodeddecoder feed, avcC, audiospecificconfig, rtp packetizer, fmp4 segmenter
-**Aliases**: PacketSink, PacketSinkHandler, packet callback, EncodedVideoChunk, EncodedAudioChunk
+**Detection Keywords**: encoded packet export, webcodecs, packet sink, h.264 access units, aac frames, encodeddecoder feed, avcC, audiospecificconfig, rtp packetizer, fmp4 segmenter, job failure summary, on_job_failed
+**Aliases**: PacketSink, PacketSinkHandler, packet callback, EncodedVideoChunk, EncodedAudioChunk, JobFailureKind, JobFailureSummary
 
 > **Experimental (new in 0.15)** — marked experimental upstream; the surface may be
 > reshaped in a future minor release. No Cargo feature flag needed — it's in the
@@ -25,6 +25,7 @@ AAC arrives as raw frames with the `AudioSpecificConfig`.
 
 - [Building a sink](#building-a-sink)
 - [Callback contract](#callback-contract)
+- [Job-failure summaries (0.16)](#job-failure-summaries-016)
 - [PacketView / EncodedPacket](#packetview--encodedpacket)
 - [Stream configuration](#stream-configuration)
 - [Strict-tier constraints](#strict-tier-constraints)
@@ -63,14 +64,18 @@ let sink = PacketSink::builder(|packet| {
 })
 .on_end(|| println!("delivery finished cleanly"))
 .on_delivery_error(|e| eprintln!("delivery failed: {e}"))
+.on_job_failed(|summary| {                       // 0.16, optional observer
+    eprintln!("job failed elsewhere: {:?} — {}", summary.kind(), summary.message());
+})
 .build();
 ```
 
 `on_packet` is the only required callback — there's no default consumer;
 `PacketSink::discard()` exists precisely so "throw it all away" is an explicit
-choice, not an accident. `on_stream_info` / `on_end` / `on_delivery_error` are
-all optional chain calls; `on_end` and `on_delivery_error` are infallible
-(`FnMut(..)`, no `Result`).
+choice, not an accident. `on_stream_info` / `on_end` / `on_delivery_error` /
+`on_job_failed` (0.16) are all optional chain calls; `on_end`,
+`on_delivery_error` and `on_job_failed` are infallible (`FnMut(..)`, no
+`Result`).
 
 **Trait-based handler** (one stateful object instead of several closures —
 see the `PacketSinkHandler` trait, whose only required method is `on_packet`):
@@ -129,6 +134,34 @@ result. Caveat carried over from ordinary Rust unwind semantics: two
 panicking destructors inside the *same* captured closure/handler still abort
 the process — this isn't a packet-sink-specific guarantee, just don't rely on
 double-panic recovery.
+
+## Job-failure summaries (0.16)
+
+When the job fails **outside this sink's own delivery path** (a decoder error,
+a sibling output's muxer, an I/O failure...), the sink's terminal reports it as
+`PacketSinkError::JobFailed`, which carries only a preformatted message. 0.16
+adds a structured companion: immediately **before** that
+`on_delivery_error(JobFailed)` dispatch, an optional observer receives a
+`&JobFailureSummary`:
+
+- `PacketSinkBuilder::on_job_failed(FnMut(&JobFailureSummary) + Send)` on the
+  closure path, or override `PacketSinkHandler::on_job_failed(&mut self,
+  &JobFailureSummary)` on the trait path (default: no-op).
+- `summary.kind() -> JobFailureKind` — coarse, one bucket per pipeline stage:
+  `Decode` / `Encode` / `Filter` / `Mux` / `Io` / `Callback` (a sibling sink's
+  rejected delivery) / `Other`. `#[non_exhaustive]`: match with a wildcard arm
+  and treat unknown kinds like `Other`. Deliberately coarse — route
+  retry/telemetry decisions on it without parsing the message.
+- `summary.stream_index() -> Option<usize>` — the output stream the recorded
+  error names, when it names one (`None` is the common case, not an anomaly).
+- `summary.ffmpeg_code() -> Option<i32>` — the raw negative `AVERROR` when the
+  error chain visibly carries one (named variants drop the integer; nothing is
+  re-synthesized).
+- `summary.message() -> &str` — byte-identical to the `JobFailed` message.
+
+The authoritative error is still what `wait()`/`stop()` returns — the summary
+exists so a sink consumer can react without parsing strings. Import
+`JobFailureKind`/`JobFailureSummary` from `ez_ffmpeg::packet_sink`.
 
 ## PacketView / EncodedPacket
 
@@ -254,11 +287,18 @@ for event in receiver.iter() {
         PacketSinkEvent::StreamInfo(streams) => { /* ... */ }
         PacketSinkEvent::Packet(packet) => { /* packet: EncodedPacket, owned */ }
         PacketSinkEvent::End => break,
+        PacketSinkEvent::JobFailure(summary) => { /* 0.16: typed summary, precedes Error(JobFailed) */ }
         PacketSinkEvent::Error(e) => { /* ... */ }
         _ => {} // #[non_exhaustive] — the event set can grow
     }
 }
 ```
+
+On the channel path, a job failure elsewhere is delivered as
+`PacketSinkEvent::JobFailure(JobFailureSummary)` queued before the terminal
+`Error(JobFailed)` event — best-effort (`try_send`): if the bounded channel is
+full at that instant the summary is dropped while the terminal event still
+arrives, so treat `JobFailure` as enrichment, not as the failure signal itself.
 
 `PacketSinkReceiver` methods: `.recv()`, `.try_recv()`,
 `.recv_timeout(Duration)`, `.iter()`, and `.into_events(scheduler)` — the last
@@ -312,5 +352,5 @@ Three runnable examples ship in the crate (`cargo run --example <name>`):
   packet sink is for when you need the encoder's bytes directly, not
   something FFmpeg's own muxers already solve. See
   [streaming.md](streaming.md).
-- **Need HEVC, other codecs, or a passthrough (no validation) tier?** Not
-  available in 0.15 — the strict tier is H.264 (libx264 only) + AAC, v1.
+- **Need HEVC, other codecs, or a passthrough (no validation) tier?** Still
+  not available as of 0.16 — the strict tier is H.264 (libx264 only) + AAC, v1.

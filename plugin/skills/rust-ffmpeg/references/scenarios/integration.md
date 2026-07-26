@@ -8,7 +8,7 @@ Quick patterns for integrating FFmpeg with web servers, storage systems, and asy
 > **Integration Dependencies** (used in examples below):
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.15.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.16.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > axum = "0.7"            # Web framework example
 > aws-sdk-s3 = "1"        # S3 integration example
@@ -24,7 +24,8 @@ Quick patterns for integrating FFmpeg with web servers, storage systems, and asy
 |----------|---------|
 | [streaming_rtmp_hls.md](streaming_rtmp_hls.md) | Real-time streaming, RTMP |
 | [batch_processing.md](batch_processing.md) | Batch processing, parallel jobs |
-| [hardware_acceleration.md](hardware_acceleration.md) | Progress monitoring, async patterns |
+| [hardware_acceleration.md](hardware_acceleration.md) | Hardware acceleration |
+| [../ez_ffmpeg/advanced.md](../ez_ffmpeg/advanced.md) | Progress monitoring (typed, 0.16), custom I/O |
 
 ---
 
@@ -155,54 +156,45 @@ fn transcode_with_progress(input: &str, output: &str) {
 }
 ```
 
-**Using ez-ffmpeg with FrameFilter**:
+**Using ez-ffmpeg (0.16 typed progress API)** — no filter stage, no pts math,
+works for stream-copy jobs too:
 ```rust
-use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
-use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::{FfmpegContext, Output};
-use ffmpeg_next::Frame;
-use ffmpeg_sys_next::AVMediaType;
+use ez_ffmpeg::{FfmpegContext, ProgressState};
 use ez_ffmpeg::container_info::get_duration_us;
-use std::sync::{Arc, Mutex};
-
-struct ProgressFilter {
-    progress: Arc<Mutex<f64>>,
-    total_duration: i64,
-}
-
-impl FrameFilter for ProgressFilter {
-    fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
-    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
-        if let Some(pts) = frame.pts() {
-            let current = pts as f64 / 1_000_000.0;
-            let total = self.total_duration as f64 / 1_000_000.0;
-            *self.progress.lock().unwrap() = (current / total * 100.0).min(100.0);
-        }
-        Ok(Some(frame))
-    }
-}
+use std::time::Duration;
 
 async fn process_with_progress(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let progress = Arc::new(Mutex::new(0.0));
-    let total_duration = get_duration_us(input)?;
+    let total_us = get_duration_us(input)?;
 
-    let pipeline = FramePipelineBuilder::from(AVMediaType::AVMEDIA_TYPE_VIDEO)
-        .filter("progress", Box::new(ProgressFilter {
-            progress: progress.clone(),
-            total_duration,
-        }));
-
-    FfmpegContext::builder()
+    let scheduler = FfmpegContext::builder()
         .input(input)
-        .output(Output::from("out.mp4").add_frame_pipeline(pipeline))
-        .build()?.start()?.await?;
+        .output("out.mp4")
+        .build()?.start()?;
 
-    println!("Final progress: {:.1}%", *progress.lock().unwrap());
+    // ProgressHandle is Clone + Send + Sync and outlives the scheduler.
+    let handle = scheduler.progress_handle();
+    let reporter = tokio::spawn(async move {
+        loop {
+            let p = handle.snapshot();
+            if let Some(out) = p.outputs().first() {
+                if let Some(pct) = out.percent_of(total_us) {
+                    println!("{:.1}%  speed {:.2}x", pct, out.speed().unwrap_or(0.0));
+                }
+            }
+            if p.state() == ProgressState::Ended { break; }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    });
+
+    scheduler.await?;          // async feature; or .wait()? on a blocking thread
+    reporter.await?;
     Ok(())
 }
 ```
-**See also**: [ez_ffmpeg/advanced.md](../ez_ffmpeg/advanced.md)
+**See also**: [ez_ffmpeg/advanced.md](../ez_ffmpeg/advanced.md#progress-monitoring) —
+snapshot semantics (per-output entries, `Option` metrics, `percent_of`). For a
+callback *per decoded frame* (live preview frames pushed over SSE/WebSocket, as in the
+sections below), a custom `FrameFilter` remains the right tool.
 
 ---
 

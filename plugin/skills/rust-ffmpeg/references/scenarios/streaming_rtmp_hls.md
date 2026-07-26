@@ -125,6 +125,10 @@ Key knobs:
 - **`.segment_type(HlsSegmentType::Fmp4)`** (0.14) switches the whole ladder from MPEG-TS to fragmented-MP4 segments — each rendition gets an `init.mp4` + `.m4s` media segments referenced via `EXT-X-MAP`, and the master bumps to `#EXT-X-VERSION:7`. Default is `HlsSegmentType::MpegTs` (byte-identical to pre-0.14 `.ts` output). Import both `HlsLadder` and `HlsSegmentType` from `ez_ffmpeg::recipes`.
 - **`.build_context()`** returns the underlying `FfmpegContext` if you want to drive the scheduler yourself instead of calling `.run()`.
 
+**Per-rendition progress (0.16)**: drive the ladder via `.build_context()` + `start()` and take `scheduler.progress_handle()` — `snapshot().outputs()` reports **each rung separately** (declaration order). HLS muxers are `AVFMT_NOFILE`, so `total_size`/`bitrate_kbps` stay `None`; `out_time_us`/`speed`/`percent_of(total_us)` work. See [advanced.md](../ez_ffmpeg/advanced.md#progress-monitoring).
+
+**Different encoders per rendition (0.16)**: `HlsLadder` uses one `.video_codec(...)` for all rungs. For a hand-built ladder that mixes codecs per output stream (e.g. an H.264 + H.265 pair in one output), use `StreamMap` per-map encoders — see [video.md](../ez_ffmpeg/video.md#per-stream-encoder-selection-streammap).
+
 **MVP scope**: CFR VOD only — a single video stream plus a single optional audio track. No live/event playlists, audio groups, or encryption (use the manual HLS patterns above for those).
 
 ## Streaming Best Practices

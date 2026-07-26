@@ -1,11 +1,11 @@
 # ez-ffmpeg: Advanced Features
 
-**Detection Keywords**: hardware acceleration, async processing, tokio, gpu encoding, videotoolbox, nvenc, qsv
-**Aliases**: hwaccel, gpu encode, async ffmpeg
+**Detection Keywords**: hardware acceleration, async processing, tokio, gpu encoding, videotoolbox, nvenc, qsv, progress monitoring, typed progress, progress snapshot, ProgressHandle
+**Aliases**: hwaccel, gpu encode, async ffmpeg, progress_handle
 
 ## Prerequisites
 
-- ez-ffmpeg 0.15.0+ with FFmpeg 7.1–8.x
+- ez-ffmpeg 0.16.0+ with FFmpeg 7.1–8.x
 - For hardware acceleration: GPU drivers and codec support
   - macOS: VideoToolbox (built-in)
   - Linux: VAAPI/NVENC drivers
@@ -284,59 +284,78 @@ FfmpegContext::builder()
 
 ## Progress Monitoring
 
-Progress monitoring uses a custom FrameFilter:
+**0.16+: use the typed pull-based progress API.** `FfmpegScheduler::progress_handle()`
+(available after `start()`, in the `Running`/`Paused` states) returns a `ProgressHandle` —
+cheap, `Clone + Send + Sync`, no FFmpeg pointers. Call `snapshot()` at any cadence; each
+call is a handful of atomic loads (no locks, no FFmpeg calls). Values are fed from the
+muxer write path *after* timestamp fixup, so they report what actually landed in the
+output — and **stream-copy/remux jobs are fully visible** (a frame-based workaround never
+sees frames on copied streams).
 
 ```rust
-use ez_ffmpeg::filter::frame_filter::{FrameFilter, FrameFilterError};
-use ez_ffmpeg::filter::frame_filter_context::FrameFilterContext;
-use ez_ffmpeg::filter::frame_pipeline_builder::FramePipelineBuilder;
-use ez_ffmpeg::{FfmpegContext, Output};
+use ez_ffmpeg::{FfmpegContext, ProgressState};
 use ez_ffmpeg::container_info::get_duration_us;
-use ffmpeg_next::Frame;
-use ffmpeg_sys_next::{AVMediaType, AVRational};
-use std::sync::Arc;
 
-struct ProgressTracker {
-    total_duration: i64,
-    time_base: AVRational,
-}
+let total_us = get_duration_us("input.mp4")?;  // the caller supplies the total
 
-impl ProgressTracker {
-    fn print_progress(&self, frame: &Frame) {
-        if let Some(pts) = frame.pts() {
-            if self.time_base.den == 0 { return; }
-            let current = pts as f64 * self.time_base.num as f64 / self.time_base.den as f64;
-            let total = self.total_duration as f64 / 1_000_000.0;
-            let progress = (current / total * 100.0).min(100.0);
-            println!("Progress: {:.1}%", progress);
+let scheduler = FfmpegContext::builder()
+    .input("input.mp4")
+    .output("output.mp4")
+    .build()?.start()?;
+
+let handle = scheduler.progress_handle();  // ProgressHandle: Clone + Send + Sync
+
+// Observe from any thread. The handle stays safe even after the scheduler is
+// consumed by wait()/stop() or dropped — snapshots then freeze at the final values.
+let watcher = std::thread::spawn(move || loop {
+    let p = handle.snapshot();
+    for out in p.outputs() {
+        if let Some(pct) = out.percent_of(total_us) {
+            println!(
+                "output {}: {:.1}%  speed {:.2}x  bitrate {:.0} kbit/s",
+                out.output_index(),
+                pct,
+                out.speed().unwrap_or(0.0),
+                out.bitrate_kbps().unwrap_or(0.0),
+            );
         }
     }
-}
-
-struct ProgressFilter { tracker: Arc<ProgressTracker> }
-
-impl FrameFilter for ProgressFilter {
-    fn media_type(&self) -> AVMediaType { AVMediaType::AVMEDIA_TYPE_VIDEO }
-    fn filter_frame(&mut self, frame: Frame, _: &mut FrameFilterContext) -> Result<Option<Frame>, FrameFilterError> {
-        self.tracker.print_progress(&frame);
-        Ok(Some(frame))
-    }
-}
-
-// Usage
-let tracker = Arc::new(ProgressTracker {
-    total_duration: get_duration_us("input.mp4")?,
-    time_base: AVRational { num: 1, den: 25 },  // Adjust based on stream info
+    if p.state() == ProgressState::Ended { break; }
+    std::thread::sleep(std::time::Duration::from_millis(500));
 });
 
-let pipeline = FramePipelineBuilder::from(AVMediaType::AVMEDIA_TYPE_VIDEO)
-    .filter("progress", Box::new(ProgressFilter { tracker }));
-
-FfmpegContext::builder()
-    .input("input.mp4")
-    .output(Output::from("output.mp4").add_frame_pipeline(pipeline))
-    .build()?.start()?.wait()?;
+scheduler.wait()?;
+watcher.join().unwrap();
 ```
+
+**Semantics worth knowing**:
+
+- **Per output**: `Progress::outputs()` holds one `OutputProgress` per output in
+  declaration order — an HLS ladder or file+preview pair reports each output separately
+  instead of collapsing into one scalar.
+- **Every metric is an `Option`** — `None` means "not knowable right now", never a
+  fabricated zero. A packet-sink output keeps all metrics `None`; an `AVFMT_NOFILE`
+  muxer (HLS, `null`) reports no `total_size`/`bitrate_kbps`.
+- Fields mirror the CLI `-progress` line: `video_packets()` (the CLI's `frame=`, counted
+  as committed *packets* — bitstream filters can change the count), `fps()`,
+  `out_time_us()` (monotonic non-decreasing across `Some` values), `total_size()`,
+  `bitrate_kbps()`, `speed()`.
+- **Percentage**: the library never guesses a total duration (trims, `-t`, live inputs).
+  Call `percent_of(total_us)` with a total you obtained yourself, e.g. from
+  `container_info::get_duration_us`.
+- `Progress::elapsed()` is wall-clock since `start()` and **includes paused time**; all
+  snapshot values freeze once the job reaches `ProgressState::Ended`.
+- `ProgressState` is `Running → Finishing → Ended` (+ `Paused`), `#[non_exhaustive]` —
+  match with a wildcard arm. `handle.is_ended()` is stricter than
+  `scheduler.is_ended()`: it means every worker has torn down (the same edge `wait()`
+  unblocks on), not just that a terminal signal was published.
+- The CLI's `-progress`/`-stats` textual interface is deliberately absent — these typed
+  snapshots are its replacement.
+
+**Per-frame hooks (pre-0.16 pattern)**: a custom `FrameFilter` in the pipeline is still
+the right tool when you need a callback *per decoded frame* (live previews, per-frame
+side effects) — see [filters.md](filters.md). Don't use it for progress: it needs manual
+pts math, adds a stage to the hot path, and reports nothing on stream-copy jobs.
 
 ## Mixing with ffmpeg-next
 
@@ -400,6 +419,9 @@ previously dropped; the output file is valid on `Ok`. Worker-thread panics
 (including a panicking custom `FrameFilter`) surface as `Error::WorkerPanicked`
 from `stop()`/`wait()` instead of reporting success over an incomplete output.
 `abort()` remains the hard-cancel path (no `Result`, output not guaranteed).
+Since 0.16, `stop()` also interrupts `set_readrate`-paced jobs promptly — the
+pacing sleeps are sliced instead of slept through, so a 1× realtime feed no
+longer delays shutdown by up to a whole pacing interval.
 
 ## Scheduler State Management
 
@@ -426,6 +448,13 @@ loop {
 // Abort if needed
 scheduler.abort();
 ```
+
+**0.16**: for richer observation than the `is_ended()` boolean, take a
+`progress_handle()` — its `snapshot().state()` distinguishes
+`Running`/`Paused`/`Finishing`/`Ended`, and `handle.is_ended()` reports the stricter
+"all workers torn down" edge (see [Progress Monitoring](#progress-monitoring)). The
+handle also outlives the scheduler, so a UI thread can keep polling after
+`wait()`/`stop()` consumed it.
 
 ## Null Output (Processing Without File)
 

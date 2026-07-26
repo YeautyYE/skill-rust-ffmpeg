@@ -35,7 +35,7 @@ decoded/encoded/muxed a single frame yet.
 
 ```toml
 [dependencies.ez-ffmpeg]
-version = "0.15.0"
+version = "0.16.0"
 features = ["cli"]
 ```
 
@@ -79,8 +79,8 @@ The 6 verified (execute-capable) shapes:
 
 Even a **Verified**-shape command additionally requires the **linked FFmpeg
 build** to match a `VERIFIED_PROFILES` entry — checked via
-`avcodec_version()`/`avformat_version()` major.minor. As of 0.15.0 there is
-**exactly one** verified profile: **FFmpeg 7.1** (avcodec 61.19 / avformat
+`avcodec_version()`/`avformat_version()` major.minor. As of 0.16.0 there is
+still **exactly one** verified profile: **FFmpeg 7.1** (avcodec 61.19 / avformat
 61.7). **FFmpeg 8.1 is not yet listed** — a profile only earns its row once a
 version-matched golden lane has run the semantic suite against that release.
 

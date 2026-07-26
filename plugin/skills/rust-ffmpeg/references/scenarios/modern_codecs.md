@@ -1,7 +1,7 @@
 # Modern Codec Support
 
-**Detection Keywords**: av1, avif, hdr, 10-bit, hdr10, hlg, vp9, hevc, modern codecs, high dynamic range
-**Aliases**: next-gen codecs, advanced video, high bit depth, wide color gamut
+**Detection Keywords**: av1, avif, hdr, 10-bit, hdr10, hlg, vp9, hevc, modern codecs, high dynamic range, hdr to sdr, tone mapping, tonemap, washed out colors, pq, smpte2084
+**Aliases**: next-gen codecs, advanced video, high bit depth, wide color gamut, zscale, libplacebo
 
 Modern video codec support including AV1, AVIF, HDR, and 10-bit processing.
 
@@ -117,6 +117,74 @@ FfmpegCommand::new()
     .spawn()?.wait()
 ```
 
+### HDR to SDR Tone Mapping (0.16 cookbook)
+
+Converting HDR footage (HDR10/PQ or HLG — the default capture format of most recent
+phones) to SDR with a naive `scale,format=yuv420p` produces a **washed-out, gray
+image**: it reinterprets the PQ/HLG brightness curve as SDR gamma and crushes the
+BT.2020 gamut into BT.709 with no tone-mapping curve. ez-ffmpeg 0.16 ships this as a
+documented cookbook (`recipes` module docs + runnable `examples/hdr_to_sdr` upstream) —
+deliberately **not** a typed `hdr_to_sdr()` helper, because the needed filters are
+optional in FFmpeg builds and a typed helper would silently fail without them.
+
+**Step 1 — detect, routing on the transfer characteristic** (0.16
+`StreamInfo::Video` fields, see [query.md](../ez_ffmpeg/query.md)):
+
+```rust
+use ez_ffmpeg::stream_info::{find_video_stream_info, StreamInfo};
+
+const AVCOL_TRC_SMPTE2084: i32 = 16;    // PQ (HDR10)
+const AVCOL_TRC_ARIB_STD_B67: i32 = 18; // HLG
+
+let Some(StreamInfo::Video { color_transfer, .. }) = find_video_stream_info("in.mp4")?
+    else { return Err("no video stream".into()) };
+let needs_tonemap =
+    color_transfer == AVCOL_TRC_SMPTE2084 || color_transfer == AVCOL_TRC_ARIB_STD_B67;
+```
+
+Route on the **transfer**, not the primaries: a BT.2020 gamut with a BT.709 transfer is
+wide-gamut *SDR* — only convert its gamut; tone-mapping it darkens the picture.
+
+**Step 2 — probe a backend, then run one of the three chains** (probe with
+`ez_ffmpeg::hwaccel::is_filter_available`, fail closed with an actionable message):
+
+```rust
+use ez_ffmpeg::{FfmpegContext, Output};
+use ez_ffmpeg::hwaccel::is_filter_available;
+
+let chain = if is_filter_available("zscale") && is_filter_available("tonemap") {
+    // CPU (needs libzimg in the FFmpeg build)
+    "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,\
+     tonemap=tonemap=hable:desat=0:peak=10,zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
+} else if is_filter_available("libplacebo") {
+    // GPU (needs libplacebo + a runtime Vulkan device)
+    "libplacebo=tonemapping=bt.2390:tonemapping_param=0.5:colorspace=bt709:\
+     color_primaries=bt709:color_trc=bt709:range=tv:format=yuv420p"
+} else {
+    // FFmpeg 8+ swscale fallback (no external library; not exercised by upstream CI)
+    "scale=out_color_matrix=bt709:out_primaries=bt709:out_transfer=bt709:\
+     out_range=tv:intent=perceptual,format=yuv420p"
+};
+
+FfmpegContext::builder()
+    .input("in.mp4")
+    .output(Output::from("sdr.mp4")
+        .set_video_filter(chain)   // per-output -vf (0.15+)
+        .set_video_codec("libx264"))
+    .build()?.start()?.wait()?;
+```
+
+**The parameters that keep the output from graying out**:
+
+- `desat=0` — the `tonemap` default (`2`) mixes highlights toward gray.
+- An **explicit `peak`**: `peak = master_nits / 100` (1000-nit master → `peak=10`). On
+  FFmpeg 8 the `zscale` linearization strips the HDR metadata that automatic peak
+  detection reads (7.1 kept it), so a fixed peak is the only version-stable choice.
+- Re-tag the output BT.709 limited-range: `r=tv` / `range=tv` / `out_range=tv`.
+
+**Verify the look on your own footage** — the chains are parameter-correct, but
+tone-mapping is subjective and content-dependent; treat them as a starting point.
+
 ### 10-bit Encoding
 
 **Using ez-ffmpeg**:
@@ -150,6 +218,7 @@ FfmpegCommand::new()
 IF need maximum compression → AV1 (slow, best quality)
 ELIF need fast modern codec → SVT-AV1 (faster than libaom)
 ELIF need HDR support → HEVC with HDR10 metadata
+ELIF HDR source must play on SDR targets → tone-map (see "HDR to SDR Tone Mapping"; never naive scale+format)
 ELIF need 10-bit color → Set profile=main10 + pix_fmt=yuv420p10le
 ELIF need image format → AVIF with still-picture=1
 ELSE → H.264 for compatibility

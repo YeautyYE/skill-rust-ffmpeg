@@ -17,7 +17,7 @@ Process multiple media files concurrently using async/parallel execution.
 > **Dependencies**:
 > ```toml
 > # For ez-ffmpeg (async)
-> ez-ffmpeg = { version = "0.15.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.16.0", features = ["async"] }
 > tokio = { version = "1", features = ["full"] }
 > futures = "0.3"
 >
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 |--------|-----------|----------------|
 | **Concurrent processing** | ✅ Native async | Thread-based (rayon/std::thread) |
 | **Resource efficiency** | High (async I/O) | Medium (process per file) |
-| **Progress tracking** | FrameFilter callback | Iterator events |
+| **Progress tracking** | Typed `progress_handle()` snapshots (0.16) | Iterator events |
 | **Use when** | Large batches, async apps | Small batches, simple CLI |
 
 ## Quick Examples
@@ -243,6 +243,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+> Per-**file** counting as above is usually enough for batches. For percent-within-a-file
+> (one long transcode among many), take each job's `scheduler.progress_handle()` and poll
+> `snapshot()` — see [advanced.md](../ez_ffmpeg/advanced.md#progress-monitoring) (0.16).
 
 **ffmpeg-sidecar (with per-file progress)**:
 ```rust

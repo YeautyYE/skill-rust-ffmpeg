@@ -12,7 +12,8 @@ Quick patterns for video transcoding, format conversion, and content manipulatio
 | [audio_extraction.md](audio_extraction.md) | Audio extract, loudness measure, metadata |
 | [image_sequences.md](image_sequences.md) | Thumbnail (`recipes::thumbnail` + fastest `skip_frame=nokey` notes), sprite sheet, frame extraction |
 | [streaming_rtmp_hls.md](streaming_rtmp_hls.md) | Real-time, RTMP, HLS, TCP, device capture |
-| [hardware_acceleration.md](hardware_acceleration.md) | Hardware acceleration, progress monitoring |
+| [hardware_acceleration.md](hardware_acceleration.md) | Hardware acceleration |
+| [../ez_ffmpeg/advanced.md](../ez_ffmpeg/advanced.md) | Progress monitoring (typed, 0.16) |
 | [batch_processing.md](batch_processing.md) | Batch transcoding, parallel processing |
 | [subtitles.md](subtitles.md) | Subtitle extraction, burning, embedding |
 
@@ -308,6 +309,6 @@ impl FrameFilter for MyFilter {
 
 For advanced transcoding scenarios, see:
 - [Hardware-accelerated encoding](hardware_acceleration.md)
-- [Progress monitoring](hardware_acceleration.md)
+- [Progress monitoring](../ez_ffmpeg/advanced.md#progress-monitoring)
 - [Batch transcoding](batch_processing.md)
 - [Complex filter graphs](../ez_ffmpeg/filters.md)
