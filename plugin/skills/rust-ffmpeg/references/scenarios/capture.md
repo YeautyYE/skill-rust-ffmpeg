@@ -5,6 +5,16 @@
 
 Capture video/audio from screen, webcam, and microphone across all Rust FFmpeg libraries.
 
+## Table of Contents
+
+- [Quick Example (30 seconds)](#quick-example-30-seconds)
+- [Library Comparison](#library-comparison)
+- [Platform Device Formats](#platform-device-formats)
+- [Common Patterns](#common-patterns)
+- [Capture Tips](#capture-tips)
+- [Detailed Examples](#detailed-examples)
+- [Related Scenarios](#related-scenarios)
+
 ## Quick Example (30 seconds)
 
 ```rust

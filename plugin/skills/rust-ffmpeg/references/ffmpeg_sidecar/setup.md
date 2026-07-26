@@ -12,6 +12,19 @@ Installation guide, auto-download features, and platform-specific configuration 
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Basic Installation](#basic-installation)
+- [Feature Flags](#feature-flags)
+- [Auto-Download FFmpeg](#auto-download-ffmpeg)
+- [Platform Support](#platform-support)
+- [Version Checking](#version-checking)
+- [Custom Installation Paths](#custom-installation-paths)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Next Steps](#next-steps)
+
 ## Related Guides
 
 | Guide | Content |

@@ -18,6 +18,14 @@ Quick patterns for integrating FFmpeg with web servers, storage systems, and asy
 > actix-web = "4"         # Sync web framework example
 > ```
 
+## Table of Contents
+
+- [Related Scenarios](#related-scenarios)
+- [Quick Start](#quick-start)
+- [Decision Guide](#decision-guide)
+- [Common Integration Patterns](#common-integration-patterns)
+- [Advanced Topics](#advanced-topics)
+
 ## Related Scenarios
 
 | Scenario | Content |
@@ -750,7 +758,7 @@ fn merge_chunks(chunk_dir: &str, output: &str, total: u64) -> std::io::Result<()
 
 For advanced integration scenarios, see:
 - [Async patterns](../ez_ffmpeg/advanced.md)
-- [Progress monitoring](hardware_acceleration.md)
+- [Progress monitoring](../ez_ffmpeg/advanced.md#progress-monitoring)
 - [Batch processing](batch_processing.md)
 - [Error handling](debugging.md)
 - [Cloud deployment](../ez_ffmpeg/advanced.md)

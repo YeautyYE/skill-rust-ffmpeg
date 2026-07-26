@@ -5,6 +5,17 @@
 
 Create high-quality animated GIFs from video across all Rust FFmpeg libraries.
 
+## Table of Contents
+
+- [Quick Example (30 seconds)](#quick-example-30-seconds)
+- [GIF Recipe Options (ez-ffmpeg)](#gif-recipe-options-ez-ffmpeg)
+- [High-Quality GIF (Two-Pass with Palette)](#high-quality-gif-two-pass-with-palette)
+- [Library Comparison](#library-comparison)
+- [Common Patterns](#common-patterns)
+- [Quality Tips](#quality-tips)
+- [Detailed Examples](#detailed-examples)
+- [Related Scenarios](#related-scenarios)
+
 ## Quick Example (30 seconds)
 
 ```rust

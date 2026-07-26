@@ -12,6 +12,13 @@ Audio extraction, processing, level monitoring, and microphone capture with ffmp
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Extract Audio](#extract-audio)
+- [Audio Level Monitoring](#audio-level-monitoring)
+- [Microphone Capture (Windows)](#microphone-capture-windows)
+
 ## Related Guides
 
 | Guide | Content |

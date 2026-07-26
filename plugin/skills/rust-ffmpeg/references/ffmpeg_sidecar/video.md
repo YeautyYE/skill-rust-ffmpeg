@@ -12,6 +12,14 @@ Video encoding, decoding, frame manipulation, filters, and test sources with ffm
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Basic Video Operations](#basic-video-operations)
+- [Decode-Process-Encode Pipeline](#decode-process-encode-pipeline)
+- [Conway's Game of Life](#conways-game-of-life)
+- [Hardware Acceleration](#hardware-acceleration)
+
 ## Related Guides
 
 | Guide | Content |

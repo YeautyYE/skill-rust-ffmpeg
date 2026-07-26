@@ -9,6 +9,16 @@
 > [Relationship to the manual mapping guide](#relationship-to-the-manual-mapping-guide)
 > before reaching for this feature.
 
+## Table of Contents
+
+- [The verification model](#the-verification-model)
+- [Runtime Profile Gate](#runtime-profile-gate-read-this-before-using-from_cli_args)
+- [Supported option surface](#supported-option-surface)
+- [Explicitly out of scope](#explicitly-out-of-scope)
+- [Error diagnostics](#error-diagnostics)
+- [Worked examples](#worked-examples)
+- [Relationship to the manual mapping guide](#relationship-to-the-manual-mapping-guide)
+
 Two functions, both under `ez_ffmpeg::cli` (re-exported: `CliError`, `CliScope`):
 
 | Function | Signature | Does |
@@ -38,16 +48,6 @@ decoded/encoded/muxed a single frame yet.
 version = "0.16.0"
 features = ["cli"]
 ```
-
-## Table of Contents
-
-- [The verification model](#the-verification-model)
-- [Runtime Profile Gate](#runtime-profile-gate-read-this-before-using-from_cli_args)
-- [Supported option surface](#supported-option-surface)
-- [Explicitly out of scope](#explicitly-out-of-scope)
-- [Error diagnostics](#error-diagnostics)
-- [Worked examples](#worked-examples)
-- [Relationship to the manual mapping guide](#relationship-to-the-manual-mapping-guide)
 
 ## The verification model
 

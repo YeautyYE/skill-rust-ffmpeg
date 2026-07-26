@@ -5,6 +5,18 @@
 
 Cross-library guide for converting between video and image sequences.
 
+## Table of Contents
+
+- [Quick Reference](#quick-reference)
+- [One-shot thumbnail / sprite sheet (recipes)](#one-shot-thumbnail--sprite-sheet-recipes)
+- [Video to Image Sequence](#video-to-image-sequence)
+- [Image Sequence to Video](#image-sequence-to-video)
+- [Advanced Operations](#advanced-operations)
+- [Common Patterns](#common-patterns)
+- [Library Selection Guide](#library-selection-guide)
+- [Troubleshooting](#troubleshooting)
+- [Related Guides](#related-guides)
+
 ## Quick Reference
 
 | Operation | ez-ffmpeg | ffmpeg-next | ffmpeg-sidecar |

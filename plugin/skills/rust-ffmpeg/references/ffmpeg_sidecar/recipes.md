@@ -12,6 +12,18 @@ Quick-start recipes for common ffmpeg-sidecar use cases.
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Hello World](#hello-world)
+- [Basic Frame Iteration](#basic-frame-iteration)
+- [Progress Monitoring](#progress-monitoring)
+- [Decode-Process-Encode Pipeline](#decode-process-encode-pipeline)
+- [Add Metadata](#add-metadata)
+- [Generate Test Video](#generate-test-video)
+- [Error Handling](#error-handling)
+- [Next Steps](#next-steps)
+
 ## Related Guides
 
 | Guide | Content |

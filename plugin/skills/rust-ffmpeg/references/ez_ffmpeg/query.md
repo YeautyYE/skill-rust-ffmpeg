@@ -3,6 +3,20 @@
 **Detection Keywords**: get duration, media info, codec info, video properties, probe, file metadata, stream info
 **Aliases**: media query, video info, file info
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Get Duration](#get-duration)
+- [Get Format](#get-format)
+- [Get Metadata](#get-metadata)
+- [Query Media Info](#query-media-info)
+- [List Available Codecs](#list-available-codecs)
+- [List Available Filters](#list-available-filters)
+- [List Capture Devices](#list-capture-devices)
+- [List Hardware Accelerators](#list-hardware-accelerators)
+- [Packet-Level Scanning](#packet-level-scanning)
+- [Probe with FFprobe (Alternative)](#probe-with-ffprobe-alternative)
+
 ## Related Guides
 
 | Guide | Content |

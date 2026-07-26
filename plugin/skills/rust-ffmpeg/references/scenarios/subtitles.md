@@ -5,6 +5,14 @@
 
 Patterns for subtitle extraction, embedding, and burning.
 
+## Table of Contents
+
+- [Related Scenarios](#related-scenarios)
+- [Quick Start](#quick-start)
+- [Decision Guide](#decision-guide)
+- [Common Patterns](#common-patterns)
+- [Advanced Topics](#advanced-topics)
+
 ## Related Scenarios
 
 | Scenario | Content |

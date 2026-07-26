@@ -355,6 +355,8 @@ cargo build --release
 
 > The crate builds bindings from the **installed** FFmpeg headers, so the current `8.1.0` line compiles against FFmpeg 7 **and** 8 — you do not downgrade the crate to match an FFmpeg-7 system. Older crate lines are listed only for pre-FFmpeg-8 toolchains.
 
+**How dual-major support works (and the history)**: `ffmpeg-sys-next` 8.1.0 runs bindgen against the installed headers and emits compile-time `ffmpeg_7_0`/`ffmpeg_7_1`/`ffmpeg_8_0`/`ffmpeg_8_1` cfgs for the detected version, which is why one crate line covers FFmpeg 7.0 through 8.x (libavcodec 61 on FFmpeg 7, 62 on FFmpeg 8). ez-ffmpeg links either major the same way; its documented floor is FFmpeg **7.1** because its pipeline is ported from the FFmpeg `n7.1` sources. You would only pin the legacy `7.1.x` crate line for reproducibility on a frozen toolchain — it is **not** required for FFmpeg 7 systems. (The old "pin 7.1.0" advice existed only because rust-ffmpeg 7.1.0 predated FFmpeg 8 support — the [#246](https://github.com/zmwangx/rust-ffmpeg/issues/246) EXIF side-data blocker, fixed and shipped in 8.0/8.1.) When pulling `ffmpeg-next` **alongside** ez-ffmpeg, keep it at `8.1.0` to match ez-ffmpeg's re-exported types — a `7.1.0` mixed in collides via the `links = "ffmpeg"` key.
+
 ---
 
 ## Fallback: Build from Source

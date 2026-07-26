@@ -3,6 +3,21 @@
 **Detection Keywords**: audio extraction, convert audio, mp3, aac, audio codec, resample, audio filter
 **Aliases**: audio processing, extract audio, audio encoding
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Audio Extraction](#audio-extraction)
+- [Video Extraction (Remove Audio)](#video-extraction-remove-audio)
+- [Split Video to WAV](#split-video-to-wav)
+- [Audio Sample Rate Modification](#audio-sample-rate-modification)
+- [Audio Channel Modification](#audio-channel-modification)
+- [Audio Volume Adjustment](#audio-volume-adjustment)
+- [Merge Audio with Video](#merge-audio-with-video)
+- [Audio Format Conversion](#audio-format-conversion)
+- [Audio Fade Effects](#audio-fade-effects)
+- [Audio Concatenation](#audio-concatenation)
+- [Audio Trimming](#audio-trimming)
+
 ## Related Guides
 
 | Guide | Content |

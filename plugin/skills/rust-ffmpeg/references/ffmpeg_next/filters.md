@@ -5,6 +5,20 @@
 
 FFmpeg filter graph for complex audio and video processing pipelines.
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Overview](#overview)
+- [Audio Filter Example](#audio-filter-example)
+- [Video Filter Example](#video-filter-example)
+- [Common Audio Filters](#common-audio-filters)
+- [Common Video Filters](#common-video-filters)
+- [Complex Filter Chains](#complex-filter-chains)
+- [Processing Loop Pattern](#processing-loop-pattern)
+- [Flushing the Filter Graph](#flushing-the-filter-graph)
+- [Filter Graph Inspection](#filter-graph-inspection)
+- [Best Practices](#best-practices)
+
 ## Related Guides
 
 | Guide | Content |

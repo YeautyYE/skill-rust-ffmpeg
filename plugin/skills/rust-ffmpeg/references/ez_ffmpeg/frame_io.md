@@ -17,6 +17,12 @@ boundary with **no intermediate files and no hand-rolled byte plumbing**:
 
 ---
 
+## Table of Contents
+
+- [Frame & Sample Export (decode → memory)](#frame--sample-export-decode--memory)
+- [Frame Push: VideoWriter (memory → encode)](#frame-push-videowriter-memory--encode)
+- [When to use this vs. alternatives](#when-to-use-this-vs-alternatives)
+
 ## Frame & Sample Export (decode → memory)
 
 Decode straight into owned Rust buffers. Import from `ez_ffmpeg::frame_export`.

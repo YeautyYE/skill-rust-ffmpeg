@@ -12,6 +12,14 @@ Progress tracking, metadata extraction, ffprobe integration, and logging.
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Progress Monitoring](#progress-monitoring)
+- [Metadata Collection](#metadata-collection)
+- [Error Handling](#error-handling)
+- [ffprobe Version Check](#ffprobe-version-check)
+
 ## Related Guides
 
 | Guide | Content |

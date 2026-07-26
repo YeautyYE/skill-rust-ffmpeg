@@ -5,6 +5,18 @@
 
 Cross-library guide for applying filters and effects to audio and video.
 
+## Table of Contents
+
+- [Quick Reference](#quick-reference)
+- [Video Filters](#video-filters)
+- [Audio Filters](#audio-filters)
+- [Complex Filter Graphs](#complex-filter-graphs)
+- [Custom Rust Filters (ez-ffmpeg)](#custom-rust-filters-ez-ffmpeg)
+- [Common Filter Reference](#common-filter-reference)
+- [Library Selection Guide](#library-selection-guide)
+- [Troubleshooting](#troubleshooting)
+- [Related Guides](#related-guides)
+
 ## Quick Reference
 
 | Operation | ez-ffmpeg | ffmpeg-next | ffmpeg-sidecar |

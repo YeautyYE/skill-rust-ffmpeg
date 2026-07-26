@@ -12,6 +12,15 @@ Terminal video rendering, ffplay preview, Whisper integration, custom filters, a
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Terminal Video Rendering](#terminal-video-rendering)
+- [Graceful Shutdown](#graceful-shutdown)
+- [FFplay Preview Pipeline](#ffplay-preview-pipeline)
+- [Game of Life Filter Preview](#game-of-life-filter-preview)
+- [Real-time Whisper Transcription](#real-time-whisper-transcription)
+
 ## Related Guides
 
 | Guide | Content |

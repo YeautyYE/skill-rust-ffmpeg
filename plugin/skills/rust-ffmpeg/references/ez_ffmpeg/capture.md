@@ -3,6 +3,20 @@
 **Detection Keywords**: screen capture, camera capture, webcam, avfoundation, device input, record screen, microphone input
 **Aliases**: capture device, screen recording, camera input
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [macOS: AVFoundation](#macos-avfoundation)
+- [Windows: DirectShow](#windows-directshow)
+- [Linux: V4L2 + ALSA](#linux-v4l2--alsa)
+- [Cross-Platform Pattern](#cross-platform-pattern)
+- [List Available Devices](#list-available-devices)
+- [Live Streaming from Capture](#live-streaming-from-capture)
+- [Separate Video and Audio Devices](#separate-video-and-audio-devices)
+- [Hardware-Accelerated Capture](#hardware-accelerated-capture)
+- [Capture with Preview (Dual Output)](#capture-with-preview-dual-output)
+- [Capture with Overlay](#capture-with-overlay)
+
 ## Related Guides
 
 | Guide | Content |

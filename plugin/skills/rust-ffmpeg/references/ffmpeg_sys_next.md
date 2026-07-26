@@ -8,6 +8,20 @@ Raw FFI bindings providing direct access to FFmpeg C libraries for Rust applicat
 **Crate**: https://crates.io/crates/ffmpeg-sys-next
 **Documentation**: https://docs.rs/ffmpeg-sys-next
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Overview](#overview)
+- [Sub-References](#sub-references)
+- [Initialization](#initialization)
+- [Core Constants](#core-constants)
+- [Rational Number Operations](#rational-number-operations)
+- [Stream Information](#stream-information)
+- [Packet Reading Loop](#packet-reading-loop)
+- [Safety Guidelines](#safety-guidelines)
+- [When to Use vs Alternatives](#when-to-use-vs-alternatives)
+- [Troubleshooting](#troubleshooting)
+
 ## Related Guides
 
 | Guide | Content |

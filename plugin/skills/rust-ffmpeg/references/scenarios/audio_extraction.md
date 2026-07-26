@@ -5,6 +5,15 @@
 
 Extract audio tracks from video files across all Rust FFmpeg libraries.
 
+## Table of Contents
+
+- [Quick Example (30 seconds)](#quick-example-30-seconds)
+- [Library Comparison](#library-comparison)
+- [Detailed Examples](#detailed-examples)
+- [When to Choose](#when-to-choose)
+- [Common Patterns](#common-patterns)
+- [Related Scenarios](#related-scenarios)
+
 ## Quick Example (30 seconds)
 
 ```rust
@@ -296,7 +305,7 @@ fn measure_loudness(path: &str) -> Result<(), Box<dyn std::error::Error>> {
 `report.loudness` is an `Option<LoudnessReport>` with fields `integrated: Option<f64>`,
 `lra: Option<f64>`, and `true_peak: Option<f64>`. Typical flow: measure first, then
 apply the `loudnorm` filter to reach the target you picked. See
-[debugging.md — Detection & Measurement](debugging.md#detection--measurement-typed)
+[detection_analysis.md](detection_analysis.md)
 for the other detectors (black/scene/silence/crop).
 
 | Goal | Use | Result |

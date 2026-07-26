@@ -5,6 +5,20 @@
 
 Direct access to FFmpeg's C API through `ffmpeg_sys_next` for advanced operations.
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Overview](#overview)
+- [Basic FFI Usage](#basic-ffi-usage)
+- [Audio Frame Data Access](#audio-frame-data-access)
+- [Advanced FFI Patterns](#advanced-ffi-patterns)
+- [Comparison: High-Level vs FFI Approaches](#comparison-high-level-vs-ffi-approaches)
+- [FFI Safety Guidelines](#ffi-safety-guidelines)
+- [Common FFI Functions Reference](#common-ffi-functions-reference)
+- [Best Practices](#best-practices)
+- [Custom I/O Callbacks](#custom-io-callbacks)
+- [PTS/DTS Correction for Loop Playback](#ptsdts-correction-for-loop-playback)
+
 ## Related Guides
 
 | Guide | Content |

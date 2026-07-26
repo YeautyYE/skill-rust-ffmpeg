@@ -5,6 +5,14 @@
 
 Patterns that go beyond one-input-one-output conversion: multi-output fan-out, concat, watermarking, and decode→encode pipelines with per-stream handling. For plain format/codec conversion, remux, trim, resize, or crop, see [video_transcoding.md](video_transcoding.md).
 
+## Table of Contents
+
+- [Related Scenarios](#related-scenarios)
+- [Quick Start](#quick-start)
+- [Decision Guide](#decision-guide)
+- [Common Patterns](#common-patterns)
+- [Advanced Topics](#advanced-topics)
+
 ## Related Scenarios
 
 | Scenario | Content |

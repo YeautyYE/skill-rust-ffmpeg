@@ -5,6 +5,12 @@
 
 Get started with Rust FFmpeg in 5 minutes.
 
+## Table of Contents
+
+- [Choose Your Library](#choose-your-library)
+- [Common First Tasks](#common-first-tasks)
+- [Installation Help](#installation-help)
+
 ## Choose Your Library
 
 ### Option 1: ez-ffmpeg

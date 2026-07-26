@@ -5,6 +5,16 @@
 
 Quick patterns for testing FFmpeg operations, validating outputs, and ensuring quality.
 
+## Table of Contents
+
+- [Test Environment Setup](#test-environment-setup)
+- [Related Scenarios](#related-scenarios)
+- [Quick Start](#quick-start)
+- [Testing Patterns](#testing-patterns)
+- [Decision Guide](#decision-guide)
+- [Common Testing Patterns](#common-testing-patterns)
+- [Advanced Topics](#advanced-topics)
+
 ## Test Environment Setup
 
 > **Important**: Before writing tests, check if local `ffmpeg` and `ffprobe` are available. They can generate test videos and verify outputs.

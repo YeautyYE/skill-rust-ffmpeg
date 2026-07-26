@@ -5,6 +5,17 @@
 
 Type definitions for pixel formats, sample formats, channel layouts, and media types.
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Pixel Formats](#pixel-formats)
+- [Sample Formats](#sample-formats)
+- [Channel Layouts](#channel-layouts)
+- [Media Types](#media-types)
+- [Codec IDs](#codec-ids)
+- [Buffer Size Calculation](#buffer-size-calculation)
+- [Format Conversion Reference](#format-conversion-reference)
+
 ## Related Guides
 
 | Guide | Content |

@@ -5,6 +5,21 @@
 
 Cross-library guide for reading, writing, and manipulating media metadata and chapters.
 
+## Table of Contents
+
+- [Quick Reference](#quick-reference)
+- [Reading Metadata](#reading-metadata)
+- [Writing Metadata](#writing-metadata)
+- [Copying Metadata from Input](#copying-metadata-from-input)
+- [Stripping Metadata](#stripping-metadata)
+- [Stream-Specific Metadata](#stream-specific-metadata)
+- [Reading Chapters](#reading-chapters)
+- [Writing Chapters](#writing-chapters)
+- [Copying Chapters Between Files](#copying-chapters-between-files)
+- [Common Metadata Keys](#common-metadata-keys)
+- [Library Selection Guide](#library-selection-guide)
+- [Related Guides](#related-guides)
+
 ## Quick Reference
 
 | Operation | ez-ffmpeg | ffmpeg-next | ffmpeg-sidecar |

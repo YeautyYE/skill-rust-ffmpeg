@@ -12,6 +12,16 @@ Error handling, common issues, best practices, and performance optimization.
 > anyhow = "1"
 > ```
 
+## Table of Contents
+
+- [Related Guides](#related-guides)
+- [Error Handling Pattern](#error-handling-pattern)
+- [Common Issues](#common-issues)
+- [Best Practices](#best-practices)
+- [Performance Tips](#performance-tips)
+- [Limitations](#limitations)
+- [Debug Mode](#debug-mode)
+
 ## Related Guides
 
 | Guide | Content |
