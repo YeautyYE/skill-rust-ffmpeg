@@ -55,6 +55,17 @@
 
 **预期收益（经修正的数字）**：description ~0.62-0.72k tokens/会话（250-300 词方案）或全量 ~0.93-1.03k（150 词方案，有 recall 风险）；body ~0.57-0.88k tokens/触发；包内消除 2 个多余文件与 3 处逐字节重复。
 
+## 附：执行记录（2026-07-27，用户批准全量 0-3）
+
+| Commit | 内容 |
+|---|---|
+| `5ba5523` | Phase 0：删 analysis-report.md + _keywords_standard.md |
+| `325a312` | Phase 1：18 断锚修复；transcoding.md → pipelines_multi_output.md 原子迁移（3 入链 + Basic Format Conversion 段替换为指针） |
+| `47ffa97` | Phase 2：Best Practices 按 12/6 矩阵收敛；例子砍 1/3/5；Layer-2 加 C-API 行 + version/build 行 + 优先级规则、行 48/60/61 link-first；#246/bindgen 考据沉入 installation.md；ez_ffmpeg.md New-in-0.16 压成链接索引；拆出 scenarios/detection_analysis.md（debugging.md 留 stub 保旧深链）；29 文件补生成式 ToC；cli_compat ToC 上移 |
+| `b6c5ac9` | Phase 3：description 601→**239 词**（~490 tokens，省 ~745/会话），25/25 语料通过；claudedocs/skill-trigger-regression-corpus.md 固化门槛；YAML 注释钉死 ≤300 词预算并终止追加惯例 |
+
+**与计划的偏差**（如实记录）：Phase 0 的 266 字符词法清理被 Phase 3 全量重写吸收（同分支落地，避免两次改写同一行）；description 终稿 239 词（低于 250-300 目标带下沿，语料 25/25 全过，更精简且无损）；ToC 修复中不存在的章节条目替换为文件内真实邻近章节而非发明内容。终检：57 文件 0 断链 0 断锚；SKILL.md 184→181 行 / 3,226→2,552 词。
+
 ## 四、开放假设（诚实边界）
 
 - TE-4/UX-1：触发召回结论均为推理（skill-creator 只规定加载时机，不规定匹配算法）；Phase 3 的回归语料是把它转成可测的唯一途径。
