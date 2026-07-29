@@ -143,6 +143,15 @@ let pcm: Vec<f32> = SampleExtractor::new("input.mp4")
 - `.collect_samples()? -> Vec<f32>` buffers everything; `.samples()? -> SampleIter`
   streams chunks for long inputs without holding the whole track in memory.
 - `Channels::{Mono, Stereo}`; interleaved layout for stereo.
+- **`.collect_audio()? -> CollectedAudio` (0.17)** — same buffer as
+  `collect_samples`, **self-describing**: `.sample_rate()`, `.channels()`, and
+  `.channel_layout()` (FFmpeg's description vocabulary — `"stereo"`, `"5.1"`;
+  above two channels this distinguishes layouts a bare count cannot), plus
+  `.as_slice()` / `.into_vec()` (no copy). Use it under the source-preserving
+  defaults, where the caller otherwise cannot know what shape arrived; a WAV
+  writer or resampler then needs no out-of-band metadata. Empty run ⇒ empty
+  buffer with zeroed metadata. The streaming path gained the same:
+  `AudioChunk::channel_layout()`.
 
 ---
 
@@ -192,7 +201,8 @@ fn main() -> Result<(), ez_ffmpeg::error::Error> {
 | Method | Effect |
 |--------|--------|
 | `.frame_size() -> usize` | Exact bytes each pushed frame must be (`w * h * bytes_per_pixel`, packed) |
-| `.write(&[u8])` / `.write_owned(Vec<u8>)` | Push one frame; applies backpressure through the bounded queue, returns `Result<(), PushError>` |
+| `.write(&[u8])` | Push one frame; applies backpressure through the bounded queue, returns `Result<(), PushError>` |
+| `.write_owned(Vec<u8>)` | Owned push; **0.17**: returns `Result<(), OwnedPushError>` — on every error path the exact allocation comes back (`SendError` convention): `.into_frame()` / `.into_parts()` / `.error()`. `From<OwnedPushError>` for `PushError`/`Error` keeps `?` composing (drops the payload) |
 | `.finish() -> Result<()>` | **Authoritative** result — drains/flushes the encoder, writes the trailer, surfaces the pipeline's first error |
 | `.abort()` | Discard the export (no valid output) |
 
@@ -200,11 +210,23 @@ Notes:
 - **`finish()` is where errors surface.** A `write()` that returns
   `PushError::PipelineClosed` means a worker failed or an `Output` limit (e.g.
   `set_max_video_frames`) ended the job early — call `finish()` for the real cause.
+- **Dropping the writer aborts, it does not finish (0.17).** Drop closes ingress
+  and hard-aborts the workers (join bounded by their status polls, not by
+  remaining data — previously a graph built to outlive the pushed stream, e.g.
+  an overlay without `shortest=1`, could block Drop indefinitely). The output is
+  NOT finalized; `finish()` is the only path that writes a playable file.
+  `abort()` ≡ drop, it just reads as intent. The one unbounded edge: a custom
+  write/seek callback that never returns holds up the join.
 - **Frame size is exact**: a wrong-length buffer is rejected as `PushError::WrongSize`.
   Query `frame_size()` after `open()` rather than computing it yourself.
 - Build/validation problems (zero dimensions, unknown/hardware pixel format,
   a graph that never consumes the pushed video, stream maps on the single stream)
-  fail at `.open()` as `error::Error::Writer(WriterError::…)`.
+  fail at `.open()` as `error::Error::Writer(WriterError::…)`. **0.17**: all of
+  these — including `Output` options the pipeline can never honor
+  (audio/subtitle configuration, input-referencing metadata →
+  `WriterError::UnsupportedOutputOption` naming the setter) — are rejected
+  **before the destination opens**, so a failed `open()` leaves no empty file
+  behind. The CFR, video-only contract is documented as permanent.
 
 ### In-memory MP4 (encode into a `Vec<u8>`)
 

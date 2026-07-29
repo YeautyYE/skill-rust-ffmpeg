@@ -425,7 +425,7 @@ A complete example showing how to create a custom video filter that tiles the in
 **Prerequisites**: Add dependencies to your `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = "0.16.0"
+ez-ffmpeg = "0.17.0"
 ffmpeg-next = "8.1.0"
 ffmpeg-sys-next = "8.1.0"
 log = "0.4"
@@ -630,10 +630,19 @@ supersedes the deprecated OpenGL filter.
 Enable the feature and add `bytemuck` (for `#[derive(Pod)]` on param structs):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.16.0", features = ["wgpu"] }
+ez-ffmpeg = { version = "0.17.0", features = ["wgpu"] }
 bytemuck = { version = "1.8", features = ["derive"] }
 env_logger = "0.11"
 ```
+
+> **0.17 — one GPU device stack per process**: filters no longer build their own
+> instance/adapter/device (hundreds of ms to seconds each); they share one
+> process-level device per profile (basic vs dmabuf-capable). First init pays the
+> build, later filters and concurrent jobs reuse it. A fatal GPU error (readback
+> map failure, device loss, the wedge timeout) latches that stack dead: the
+> causing job keeps its original error, concurrent jobs fail promptly with a
+> `GpuGenerationLost` job error instead of timing out, and the next init builds a
+> fresh stack. Pipelines/shaders/buffers stay per-filter.
 
 Full example — a colour `adjust` shader with **live parameter updates** and
 **per-frame GPU timing**:

@@ -3,10 +3,11 @@
 **Detection Keywords**: high-level API, simple transcoding, builder pattern, easy ffmpeg, video conversion, format conversion
 **Aliases**: ez-ffmpeg, ezffmpeg, simple ffmpeg rust
 
-**Version**: 0.16.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
+**Version**: 0.17.0 | [Repository](https://github.com/YeautyYE/ez-ffmpeg) | [Docs](https://docs.rs/ez-ffmpeg)
 
 Safe, ergonomic Rust FFmpeg interface with Builder pattern API.
 
+**New in 0.17**: self-describing audio extraction (`SampleExtractor::collect_audio` → `CollectedAudio` with rate/channels/layout; `AudioChunk::channel_layout()`), `VideoWriter` contract fixes (`write_owned` hands the frame back on failure via `OwnedPushError`; Drop aborts instead of draining; unhonorable `Output` options rejected before the destination opens — [frame_io.md](ez_ffmpeg/frame_io.md)), panic containment on every library-owned callback surface (`Error::WorkerPanicked`, [advanced.md](ez_ffmpeg/advanced.md#custom-io-sources)), one shared GPU device stack per process for wgpu filters ([filters.md](ez_ffmpeg/filters.md#gpu-custom-filters-wgpu)), documented hwaccel device-context caching policy ([scenarios/hardware_acceleration.md](scenarios/hardware_acceleration.md)), and 32-bit target support (armv7/i686 — [installation.md](installation.md#version-compatibility)).
 **New in 0.16**: typed pull-based progress ([advanced.md](ez_ffmpeg/advanced.md#progress-monitoring)), per-stream encoder selection via `StreamMap` ([video.md](ez_ffmpeg/video.md#per-stream-encoder-selection-streammap)), packet-sink job-failure observers ([packet_sink.md](ez_ffmpeg/packet_sink.md#job-failure-summaries-016)), HDR detection fields on `StreamInfo::Video` + an HDR→SDR tone-mapping cookbook ([query.md](ez_ffmpeg/query.md), [scenarios/modern_codecs.md](scenarios/modern_codecs.md)), fully synchronous RTMP `stop()` ([streaming.md](ez_ffmpeg/streaming.md)), and a canonical upstream [installation guide](https://github.com/YeautyYE/ez-ffmpeg/blob/main/docs/INSTALL.md).
 **New in 0.15**: encoded packet export (`packet_sink::PacketSink` — H.264/AAC access units straight from the encoder, WebCodecs-ready avcC/AudioSpecificConfig, no container; experimental, strict libx264/AAC-only tier), CLI command translation (`cli` feature: `from_cli_args`/`emit_rust_code` run or translate a narrow, golden-tested command subset — 6 verified shapes; execution additionally gated on a verified FFmpeg runtime profile, FFmpeg 7.1 only today), per-output simple video filter (`Output::set_video_filter`, distinct from context-level `filter_desc`), `FrameExtractor` conversion-precision tiers (`ConversionPrecision::{Standard, High}` — default now matches the FFmpeg CLI's own swscale flags; `High` reproduces 0.14.0's byte-for-byte output), optional packet-payload capture (`PacketScanner::set_capture_data`), and RTMP embedded-server lifecycle hardening (`Error::RtmpServerAlreadyStarted` when a cloned server handle is started twice, `RtmpRegistrationQueueFull` under an extreme registration backlog). See [packet_sink.md](ez_ffmpeg/packet_sink.md), [cli_compat.md](ez_ffmpeg/cli_compat.md), [filters.md](ez_ffmpeg/filters.md#per-output-simple-video-filter-set_video_filter-015), and [frame_io.md](ez_ffmpeg/frame_io.md).
 **New in 0.14** (experimental): in-memory frame/sample export (`frame_export::{FrameExtractor, SampleExtractor}` — decode to packed RGB / `f32` PCM for AI/CV/ASR), frame push (`VideoWriter` — render frames in Rust and encode/mux/stream them, no demuxer), muxer & output-protocol capability probes (`capabilities::{is_muxer_available, is_output_protocol_available}`), WHIP WebRTC output (FFmpeg 8+) and SRT output, fMP4 HLS segments (`HlsLadder::segment_type(HlsSegmentType::Fmp4)`), and named-encoder unavailable-codec errors. See [frame_io.md](ez_ffmpeg/frame_io.md) and [streaming.md](ez_ffmpeg/streaming.md).
@@ -254,7 +255,7 @@ FfmpegContext::builder()
 
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.16.0", features = ["async"] }
+ez-ffmpeg = { version = "0.17.0", features = ["async"] }
 ```
 
 **System dependencies** (one-time setup, see [installation.md](installation.md) for complete list):
@@ -265,11 +266,11 @@ ez-ffmpeg = { version = "0.16.0", features = ["async"] }
 **Feature options**:
 ```toml
 # Static linking (Windows recommended)
-ez-ffmpeg = { version = "0.16.0", features = ["async", "static"] }
+ez-ffmpeg = { version = "0.17.0", features = ["async", "static"] }
 
 # Build FFmpeg from source (last resort when system FFmpeg unavailable).
 # ez-ffmpeg has NO `build` feature — enable it through the underlying sys crate:
-ez-ffmpeg = { version = "0.16.0", features = ["async"] }
+ez-ffmpeg = { version = "0.17.0", features = ["async"] }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 ```
 

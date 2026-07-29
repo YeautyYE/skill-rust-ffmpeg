@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-- ez-ffmpeg 0.16.0+ with FFmpeg 7.1–8.x
+- ez-ffmpeg 0.17.0+ with FFmpeg 7.1–8.x
 - For hardware acceleration: GPU drivers and codec support
   - macOS: VideoToolbox (built-in)
   - Linux: VAAPI/NVENC drivers
@@ -97,7 +97,7 @@ FfmpegContext::builder()
 
 Use callback-based I/O for non-file sources. Callbacks return `i32` directly (bytes read/written, 0 for EOF, negative for error).
 
-> **0.13**: a panicking custom-IO callback no longer unwinds across the FFI boundary (undefined behavior) — it is contained with `catch_unwind`, poisons that stream context, and surfaces as an I/O error from the job. Still, prefer returning a negative error code over panicking.
+> **0.13**: a panicking custom-IO callback no longer unwinds across the FFI boundary (undefined behavior) — it is contained with `catch_unwind`, poisons that stream context, and surfaces as an I/O error from the job. **0.17** extends this to **every** library-owned surface user code runs on (frame-filter hooks, packet-sink delivery, custom AVIO, logger backends, the decoder get-format callback, async wakers, RTMP accept/reactor threads): the unwind never crosses an `extern "C"` frame, a poisoned custom-IO callback fails the job deterministically instead of being re-entered, and contained panics surface as `Error::WorkerPanicked`. Still, prefer returning a negative error code over panicking.
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Input, Output};

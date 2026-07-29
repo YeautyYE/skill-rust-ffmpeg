@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 **Installation** (sync):
 ```toml
 [dependencies]
-ez-ffmpeg = "0.16.0"
+ez-ffmpeg = "0.17.0"
 ```
 
 **Async version** (requires `async` feature):
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 **Installation** (async):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.16.0", features = ["async"] }
+ez-ffmpeg = { version = "0.17.0", features = ["async"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

@@ -175,7 +175,7 @@ $env:VCPKGRS_DYNAMIC = "0"  # Force static linking
 **Cargo.toml**:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.16.0", features = ["static"] }
+ez-ffmpeg = { version = "0.17.0", features = ["static"] }
 # OR
 ffmpeg-next = { version = "8.1.0", features = ["static"] }
 ```
@@ -320,7 +320,7 @@ pkg-config --modversion libavutil    # 59.x / 60.x
 
 # Test build
 cargo new --bin ffmpeg_test && cd ffmpeg_test
-echo 'ez-ffmpeg = "0.16.0"' >> Cargo.toml
+echo 'ez-ffmpeg = "0.17.0"' >> Cargo.toml
 cargo build --release
 ```
 
@@ -336,7 +336,7 @@ vcpkg integrate install
 # Test build (pkg-config/ffmpeg CLI may not be available)
 cargo new --bin ffmpeg_test
 cd ffmpeg_test
-Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.16.0", features = ["static"] }'
+Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.17.0", features = ["static"] }'
 cargo build --release
 ```
 
@@ -348,12 +348,17 @@ cargo build --release
 
 | Library | Version | FFmpeg Required | libavcodec Version |
 |---------|---------|-----------------|-------------------|
-| ez-ffmpeg | 0.16.0 | 7.1 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
+| ez-ffmpeg | 0.17.0 | 7.1 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
 | ffmpeg-next / -sys-next | 8.1.0 (current) | 7.0 – 8.x | 61.x / 62.x (auto-detected) |
 | ffmpeg-next / -sys-next | 7.1.x (legacy) | 4.x – 7.1 | ≤ 61.x |
 | ffmpeg-next / -sys-next | 6.x (legacy) | ≤ 6.x | ≤ 60.x |
 
 > The crate builds bindings from the **installed** FFmpeg headers, so the current `8.1.0` line compiles against FFmpeg 7 **and** 8 — you do not downgrade the crate to match an FFmpeg-7 system. Older crate lines are listed only for pre-FFmpeg-8 toolchains.
+
+> **32-bit targets (0.17)**: ez-ffmpeg now compiles on 32-bit architectures
+> (`armv7-unknown-linux-gnueabihf`, `i686-unknown-linux-gnu`) — earlier versions
+> hit an `AVBPrint` layout mismatch there — and upstream CI runs a native armhf
+> lane. Useful for Raspberry Pi OS 32-bit and similar embedded targets.
 
 **How dual-major support works (and the history)**: `ffmpeg-sys-next` 8.1.0 runs bindgen against the installed headers and emits compile-time `ffmpeg_7_0`/`ffmpeg_7_1`/`ffmpeg_8_0`/`ffmpeg_8_1` cfgs for the detected version, which is why one crate line covers FFmpeg 7.0 through 8.x (libavcodec 61 on FFmpeg 7, 62 on FFmpeg 8). ez-ffmpeg links either major the same way; its documented floor is FFmpeg **7.1** because its pipeline is ported from the FFmpeg `n7.1` sources. You would only pin the legacy `7.1.x` crate line for reproducibility on a frozen toolchain — it is **not** required for FFmpeg 7 systems. (The old "pin 7.1.0" advice existed only because rust-ffmpeg 7.1.0 predated FFmpeg 8 support — the [#246](https://github.com/zmwangx/rust-ffmpeg/issues/246) EXIF side-data blocker, fixed and shipped in 8.0/8.1.) When pulling `ffmpeg-next` **alongside** ez-ffmpeg, keep it at `8.1.0` to match ez-ffmpeg's re-exported types — a `7.1.0` mixed in collides via the `links = "ffmpeg"` key.
 
@@ -371,7 +376,7 @@ When system FFmpeg installation is impossible (restricted environments, no admin
 ffmpeg-next = { version = "8.1.0", features = ["build"] }
 
 # ez-ffmpeg has NO `build` feature — enable source build via the sys crate:
-ez-ffmpeg = { version = "0.16.0" }
+ez-ffmpeg = { version = "0.17.0" }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 
 # With GPL codecs (x264, x265)
