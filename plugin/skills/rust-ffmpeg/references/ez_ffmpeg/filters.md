@@ -9,7 +9,7 @@
 - [Built-in FFmpeg Filters](#built-in-ffmpeg-filters)
   - [Common Video Filters](#common-video-filters)
   - [Common Audio Filters](#common-audio-filters)
-- [Per-Output Simple Video Filter (set_video_filter, 0.15+)](#per-output-simple-video-filter-set_video_filter-015)
+- [Per-Output Simple Filters (set_video_filter 0.15+, set_audio_filter 0.18+)](#per-output-simple-filters-set_video_filter-015-set_audio_filter-018)
 - [Custom Rust Filters (FrameFilter)](#custom-rust-filters-framefilter)
 - [FrameFilter with Frame Request](#framefilter-with-frame-request)
 - [Frame Sender Filter](#frame-sender-filter)
@@ -108,10 +108,10 @@ FfmpegContext::builder()
 .filter_desc("pan=mono|c0=0.5*c0+0.5*c1")  // Stereo to mono
 ```
 
-## Per-Output Simple Video Filter (`set_video_filter`, 0.15+)
+## Per-Output Simple Filters (`set_video_filter` 0.15+, `set_audio_filter` 0.18+)
 
-A second way to attach a filter, scoped to **one output's video stream** —
-the builder analog of the FFmpeg CLI's per-output `-vf`, as distinct from
+A second way to attach a filter, scoped to **one output's stream** —
+the builder analog of the FFmpeg CLI's per-output `-vf` / `-af`, as distinct from
 `filter_desc()` above (a **context-level** graph, CLI's `-filter_complex`,
 which can span multiple inputs/outputs):
 
@@ -127,23 +127,39 @@ FfmpegContext::builder()
             .set_audio_codec("copy"),
     )
     .build()?.start()?.wait()?;
+
+// 0.18 — the audio side: ffmpeg -i in.m4a -af aformat=sample_rates=16000 -c:a aac out.m4a
+FfmpegContext::builder()
+    .input("in.m4a")
+    .output(
+        Output::from("out.m4a")
+            .set_audio_filter("aformat=sample_rates=16000") // -af
+            .set_audio_codec("aac"),
+    )
+    .build()?.start()?.wait()?;
 ```
 
-`.clear_video_filter()` removes a chain set earlier, restoring passthrough.
-Only video is affected — there's no per-output audio-filter (`-af`) equivalent
-yet. `VideoWriter` (see [frame_io.md](frame_io.md)) honors it too.
+`.clear_video_filter()` / `.clear_audio_filter()` remove a chain set earlier,
+restoring passthrough (`anull` on the audio side). Each setter touches only its
+own media type. `VideoWriter` (see [frame_io.md](frame_io.md)) honors
+`set_video_filter` and **rejects** `set_audio_filter` — a writer job has no
+audio stream.
 
-The chain must be a single connected pipe from one video-in pad to one
-video-out pad; validation runs at `build()`, not at the `set_video_filter()`
-call itself, and fails as one of these `OpenOutputError` variants:
+Each chain must be a single connected pipe from one in-pad to one out-pad of
+that media type; validation runs at `build()`, not at the setter call itself,
+and fails as one of these `OpenOutputError` variants:
 
 | Trigger | Error |
 |---------|-------|
-| `set_video_filter(..)` combined with `set_video_codec("copy")` (or a copy stream map covering video) | `FilterWithStreamCopy` |
-| This output's video is also fed by a context-level `filter_desc` graph | `SimpleAndComplexFilter` |
-| Chain isn't one connected linear pipe (e.g. `"split"` — 2 output pads; or two disconnected sub-chains) | `SimpleFilterInvalidShape` |
-| Filter configured, but the output ends up with no re-encoded video stream to run it on (audio-only input, `disable_video()`, an optional map matching nothing) | `VideoFilterUnused` |
-| An audio-only chain attached as the (implicitly video) filter, e.g. `set_video_filter("anull")` | `SimpleFilterMediaTypeMismatch` |
+| Filter combined with `set_video_codec("copy")` / `set_audio_codec("copy")` (or a copy stream map covering that stream) | `FilterWithStreamCopy` |
+| This output's stream is also fed by a context-level `filter_desc` graph | `SimpleAndComplexFilter` |
+| Chain isn't one connected linear pipe (e.g. `"split"`/`"asplit"` — 2 output pads; or two disconnected sub-chains) | `SimpleFilterInvalidShape` |
+| Filter configured, but the output ends up with no re-encoded stream of that type to run it on (`disable_video()`/`disable_audio()`, an optional map matching nothing) | `VideoFilterUnused` / `AudioFilterUnused` |
+| A chain of the wrong media type, e.g. `set_video_filter("anull")` or `set_audio_filter("scale")` | `SimpleFilterMediaTypeMismatch` |
+
+An **empty string is kept**, and fails `build()` exactly as `-vf ""` / `-af ""`
+fails the CLI (an empty graph parses to zero pads) — use the `clear_*` setter to
+remove a chain instead.
 
 A runtime-conditional router like `streamselect` is accepted as long as it's
 *structurally* reachable — the check validates topology, not which branch a
@@ -425,7 +441,7 @@ A complete example showing how to create a custom video filter that tiles the in
 **Prerequisites**: Add dependencies to your `Cargo.toml`:
 ```toml
 [dependencies]
-ez-ffmpeg = "0.17.0"
+ez-ffmpeg = "0.18.0"
 ffmpeg-next = "8.1.0"
 ffmpeg-sys-next = "8.1.0"
 log = "0.4"
@@ -630,7 +646,7 @@ supersedes the deprecated OpenGL filter.
 Enable the feature and add `bytemuck` (for `#[derive(Pod)]` on param structs):
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.17.0", features = ["wgpu"] }
+ez-ffmpeg = { version = "0.18.0", features = ["wgpu"] }
 bytemuck = { version = "1.8", features = ["derive"] }
 env_logger = "0.11"
 ```

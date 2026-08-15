@@ -562,9 +562,15 @@ FfmpegContext::builder()
 
 | CLI Option | ez-ffmpeg Method | Notes |
 |------------|------------------|-------|
-| `-vf filter` | `.filter_desc("filter")` | Video filter |
-| `-af filter` | `.filter_desc("filter")` | Audio filter |
-| `-filter_complex graph` | `.filter_desc("graph")` | Complex filter graph |
+| `-vf filter` | `Output::set_video_filter("filter")` | Per-output video filter (0.15+) — the exact `-vf` analog |
+| `-af filter` | `Output::set_audio_filter("filter")` | Per-output audio filter (0.18+) — the exact `-af` analog |
+| `-filter_complex graph` | `.filter_desc("graph")` | Context-level graph, can span inputs/outputs |
+
+`filter_desc` also works for simple single-stream chains, but it is the
+`-filter_complex` analog: one graph for the whole context. Use the per-output
+setters when you mean per-output, and note the two are mutually exclusive on the
+same stream (`OpenOutputError::SimpleAndComplexFilter`). See
+[filters.md](filters.md#per-output-simple-filters-set_video_filter-015-set_audio_filter-018).
 
 ### Encoder Options
 

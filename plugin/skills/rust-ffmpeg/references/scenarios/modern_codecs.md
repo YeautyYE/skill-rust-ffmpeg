@@ -145,8 +145,15 @@ let needs_tonemap =
 Route on the **transfer**, not the primaries: a BT.2020 gamut with a BT.709 transfer is
 wide-gamut *SDR* — only convert its gamut; tone-mapping it darkens the picture.
 
+**The third case (0.18)**: an **unspecified** transfer on a BT.2020 container is
+neither. Guessing PQ washes out a tagged-SDR file; guessing SDR skips tone mapping
+on missing-tag HDR. The upstream example fails closed here (`AmbiguousHdr`) and
+asks the caller to supply `color_trc` explicitly instead of picking a branch.
+Fully untagged (`unspecified` everywhere) is ordinary SDR.
+
 **Step 2 — probe a backend, then run one of the three chains** (probe with
-`ez_ffmpeg::hwaccel::is_filter_available`, fail closed with an actionable message):
+`ez_ffmpeg::capabilities::is_filter_available`, or the identical
+`hwaccel::is_filter_available`; fail closed with an actionable message):
 
 ```rust
 use ez_ffmpeg::{FfmpegContext, Output};
@@ -181,6 +188,16 @@ FfmpegContext::builder()
   FFmpeg 8 the `zscale` linearization strips the HDR metadata that automatic peak
   detection reads (7.1 kept it), so a fixed peak is the only version-stable choice.
 - Re-tag the output BT.709 limited-range: `r=tv` / `range=tv` / `out_range=tv`.
+
+**Preflight the candidate, don't just probe the name (0.18)**: `is_filter_available`
+answers "compiled in", not "will configure". `libplacebo` without a Vulkan
+runtime/ICD passes the name probe and then fails the job at graph-config time. The
+upstream routing builds a **minimal test graph per candidate** and falls through to
+the next backend when it does not configure. Any nominal peak works for the
+preflight — the value shapes the curve, not whether the graph configures.
+
+**Also 0.18**: HDR side-data cleanup deletes only HDR-typed entries, so A53
+closed captions survive the conversion.
 
 **Verify the look on your own footage** — the chains are parameter-correct, but
 tone-mapping is subjective and content-dependent; treat them as a starting point.

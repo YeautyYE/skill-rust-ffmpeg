@@ -175,7 +175,7 @@ $env:VCPKGRS_DYNAMIC = "0"  # Force static linking
 **Cargo.toml**:
 ```toml
 [dependencies]
-ez-ffmpeg = { version = "0.17.0", features = ["static"] }
+ez-ffmpeg = { version = "0.18.0", features = ["static"] }
 # OR
 ffmpeg-next = { version = "8.1.0", features = ["static"] }
 ```
@@ -320,7 +320,7 @@ pkg-config --modversion libavutil    # 59.x / 60.x
 
 # Test build
 cargo new --bin ffmpeg_test && cd ffmpeg_test
-echo 'ez-ffmpeg = "0.17.0"' >> Cargo.toml
+echo 'ez-ffmpeg = "0.18.0"' >> Cargo.toml
 cargo build --release
 ```
 
@@ -336,7 +336,7 @@ vcpkg integrate install
 # Test build (pkg-config/ffmpeg CLI may not be available)
 cargo new --bin ffmpeg_test
 cd ffmpeg_test
-Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.17.0", features = ["static"] }'
+Add-Content Cargo.toml 'ez-ffmpeg = { version = "0.18.0", features = ["static"] }'
 cargo build --release
 ```
 
@@ -348,12 +348,18 @@ cargo build --release
 
 | Library | Version | FFmpeg Required | libavcodec Version |
 |---------|---------|-----------------|-------------------|
-| ez-ffmpeg | 0.17.0 | 7.1 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
+| ez-ffmpeg | 0.18.0 | 7.1 – 8.x | 61.x (FFmpeg 7) / 62.x (FFmpeg 8) |
 | ffmpeg-next / -sys-next | 8.1.0 (current) | 7.0 – 8.x | 61.x / 62.x (auto-detected) |
 | ffmpeg-next / -sys-next | 7.1.x (legacy) | 4.x – 7.1 | ≤ 61.x |
 | ffmpeg-next / -sys-next | 6.x (legacy) | ≤ 6.x | ≤ 60.x |
 
 > The crate builds bindings from the **installed** FFmpeg headers, so the current `8.1.0` line compiles against FFmpeg 7 **and** 8 — you do not downgrade the crate to match an FFmpeg-7 system. Older crate lines are listed only for pre-FFmpeg-8 toolchains.
+
+> **MSRV is declared (0.18)**: `rust-version = "1.80"` is now in the manifest, so an
+> older toolchain gets a clear MSRV error instead of arbitrary compile failures. The
+> `wgpu` feature still needs **1.85+**. Dependency floors were also raised past two
+> advisories (`crossbeam-channel` ≥ 0.5.15 for RUSTSEC-2025-0024, `bytes` ≥ 1.11.1 for
+> RUSTSEC-2026-0007) — a fresh resolve can no longer pick the vulnerable versions.
 
 > **32-bit targets (0.17)**: ez-ffmpeg now compiles on 32-bit architectures
 > (`armv7-unknown-linux-gnueabihf`, `i686-unknown-linux-gnu`) — earlier versions
@@ -376,7 +382,7 @@ When system FFmpeg installation is impossible (restricted environments, no admin
 ffmpeg-next = { version = "8.1.0", features = ["build"] }
 
 # ez-ffmpeg has NO `build` feature — enable source build via the sys crate:
-ez-ffmpeg = { version = "0.17.0" }
+ez-ffmpeg = { version = "0.18.0" }
 ffmpeg-sys-next = { version = "8.1.0", features = ["build"] }
 
 # With GPL codecs (x264, x265)

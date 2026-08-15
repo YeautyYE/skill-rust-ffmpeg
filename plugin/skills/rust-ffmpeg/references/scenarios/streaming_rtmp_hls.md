@@ -120,7 +120,9 @@ Handled automatically:
 Key knobs:
 - **`.fps(num, den)`** declares the **CFR** frame rate used to derive the fixed GOP. **Omit it to probe the rate from the input** — it is only required for non-probeable inputs (e.g. callback sources).
 - **`.segment_duration(secs)`** must be an integer multiple of the GOP length (default GOP == segment duration; override with `.gop_seconds(secs)`).
-- **`.video_codec("libx264")` / `.audio_codec("aac")` / `.audio_bitrate("128k")`** set the encoders and audio rate.
+- **`.video_codec("libx264")` / `.audio_codec("aac")` / `.audio_bitrate("128k")`** set the encoders and audio rate. **0.18** widens `video_codec` beyond libx264: pass any of the auto-admitted H.264 wrappers (`h264_videotoolbox`, `h264_nvenc`, `h264_qsv`, `libopenh264`) and the recipe applies the same HLS-safe option set auto mode would (pixel format, `bf=0`, periodic IDR). Any *other* name keeps the generic `g`/`keyint_min`/`sc_threshold` options, which that encoder may ignore. Names match FFmpeg's `avcodec_find_encoder_by_name` **exactly** (case-sensitive) — prefer an exact `AVCodec.name` over a descriptor like `"h264"`, which resolves host-dependently and is not treated as an admitted wrapper.
+- **`.video_codec_auto()` (0.18)** opts into runtime-aware selection: `libx264` if registered (historical behavior, no warning), otherwise trial-open in order `h264_videotoolbox` → `h264_nvenc` → `h264_qsv` → `libopenh264`. Fallback output is **host-dependent** (quality, speed, profile/level, bytes all change), so pin an encoder with `.video_codec(...)` for reproducible deployments. Selection failures surface as `Error::HlsEncoderSelection` (`HlsEncoderSelectionError`, with a per-candidate `HlsEncoderAttempt` list on `AutoSelectionFailed`). The trial-open runs **rung by rung with every session held open at once** — proving the ladder's real concurrent session count — before any output directory is created, and leaves the process-global hardware-device registry untouched. A later real `avcodec_open2` failure is not retried with a different encoder.
+- **`.video_codec_tag("hvc1")` (0.18)** sets the sample-entry FourCC per rendition (`-tag:v`). Needed for HEVC on Apple HLS: libx265 emits `hev1` by default, which many Apple players reject.
 - **`.rendition_named(Rendition::new(w, h, "5000k").with_name("hd"))`** appends a rendition with a custom directory/variant name; **`.codecs("avc1.640028,mp4a.40.2")`** sets the master `CODECS` attribute.
 - **`.segment_type(HlsSegmentType::Fmp4)`** (0.14) switches the whole ladder from MPEG-TS to fragmented-MP4 segments — each rendition gets an `init.mp4` + `.m4s` media segments referenced via `EXT-X-MAP`, and the master bumps to `#EXT-X-VERSION:7`. Default is `HlsSegmentType::MpegTs` (byte-identical to pre-0.14 `.ts` output). Import both `HlsLadder` and `HlsSegmentType` from `ez_ffmpeg::recipes`.
 - **`.build_context()`** returns the underlying `FfmpegContext` if you want to drive the scheduler yourself instead of calling `.run()`.
@@ -158,12 +160,28 @@ Keyframes (I-frames) must align with segment boundaries for smooth playback:
     .set_video_codec("libx264")
     .set_force_key_frames("0,2,4,6,8,10"))
 
+// ez-ffmpeg 0.18+: PREFERRED for segmenting — typed periodic IDR, no expr: string,
+// no list to extend for a stream of unknown length.
+.output(Output::from("stream.m3u8")
+    .set_format("hls")
+    .set_format_opt("hls_time", "2")
+    .set_video_codec("libx264")
+    .set_force_key_frames_interval(std::time::Duration::from_secs(2)))
+
 // ffmpeg-sidecar
 .args(["-g", "60", "-keyint_min", "60", "-sc_threshold", "0"])
 .args(["-force_key_frames", "expr:gte(t,n_forced*2)"])
 ```
 
 **Why this matters**: Without keyframe alignment, players may experience buffering or seek issues.
+
+`set_force_key_frames_interval` is the typed periodic subset of
+`-force_key_frames` (0.18): targets are `first_valid_pts + k * interval`, each
+applied to the first frame whose PTS reaches it. A frame that skips targets (a
+drop) is forced once and the cursor advances past its PTS — missed targets are
+not repaid later. It replaces any earlier `set_force_key_frames` list and vice
+versa. `pict_type = I` stays a **request**: software encoders typically honor it,
+hardware encoders may not. Zero interval is rejected at `build()`.
 
 ### Real-time Input Rate Control
 

@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-- ez-ffmpeg 0.17.0+ with FFmpeg 7.1–8.x
+- ez-ffmpeg 0.18.0+ with FFmpeg 7.1–8.x
 - For hardware acceleration: GPU drivers and codec support
   - macOS: VideoToolbox (built-in)
   - Linux: VAAPI/NVENC drivers
@@ -281,6 +281,48 @@ FfmpegContext::builder()
     .output(output)
     .build()?.start()?.wait()?;
 ```
+
+### Rust HTTP(S) input (`http-input` feature, 0.18, experimental)
+
+A default-off feature that drives one HTTP(S) response body into FFmpeg through
+the custom-AVIO bridge, using **rustls** instead of the linked FFmpeg's HTTPS
+protocol. Reach for it when you need Rust-side control of the request — custom
+headers, auth, proxy, a shared connection pool, typed failures — or when the
+linked build has no HTTPS protocol at all.
+
+```toml
+ez-ffmpeg = { version = "0.18.0", features = ["http-input"] }
+```
+
+```rust
+use ez_ffmpeg::http_input::HttpInput;
+use ez_ffmpeg::{FfmpegContext, Input};
+
+let http = HttpInput::builder("https://example.com/video.mp4")
+    .header("Authorization", "Bearer …")?   // also .user_agent(), .timeouts(),
+    .build()?;                              // .read_idle_timeout(), .reconnect(), …
+
+FfmpegContext::builder()
+    .input(Input::from(http))               // normal Input setters apply after conversion
+    .output("out.mp4")
+    .build()?.start()?.wait()?;
+```
+
+- **Opt-in only** — `Input::from("https://…")` routing is unchanged: a plain URL
+  string still goes to FFmpeg's own protocol. Only the explicit `HttpInput` /
+  `HttpClient` types use the Rust stack.
+- **One body = one media resource** (MP4, MPEG-TS, FLV, Matroska, or one live
+  connection). **HLS and DASH are rejected** by URL, Content-Type, and prefix
+  sniff — a manifest needs a demuxer-specific adapter that this is not.
+- Failures surface as typed `HttpInputError` (promoted over generic FFmpeg errnos
+  at both open and demux time), not an opaque `-EIO`. `.header()` returns a
+  `Result` — reserved names (`Range`, `Accept-Encoding`, …) are rejected, since
+  the bridge owns them.
+- Conversion sets `exit_on_error`, so a truncated body or a changed resource fails
+  the job instead of finishing as a short read. Reconnect is **off** by default;
+  for seekable VOD resume use `ReconnectPolicy::seekable_default`.
+- `HttpClient` shares a connection pool across several inputs.
+- **Experimental**: errors, builder fields, and reconnect policy may still change.
 
 ## Progress Monitoring
 

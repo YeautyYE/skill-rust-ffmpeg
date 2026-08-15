@@ -229,7 +229,8 @@ them.
 
 | Rule | Fails as | When |
 |------|----------|------|
-| Video encoder must be **`libx264`** — exact name match, not codec ID (`h264_nvenc` does **not** pass, even though it's also H.264) | `PacketSinkError::EncoderNotWhitelisted` | `build()` |
+| Video encoder must be a **verified-registry H.264 wrapper** — exact name match, not codec ID. As of **0.18**: `libx264`, `h264_nvenc`, `h264_videotoolbox`, `libopenh264`. Any other H.264 encoder (e.g. `h264_qsv`, `h264_amf`) is refused even though it is also H.264 | `PacketSinkError::EncoderNotWhitelisted` | `build()` |
+| **`h264_videotoolbox` only**: B-frames are rejected at build — its runtime emits B-frames the annex-B sink cannot reorder. The other three wrappers may configure B-frames and rely on the runtime `pts >= dts` guard | `PacketSinkError` (build rejection) | `build()` |
 | Audio encoder must declare `AV_CODEC_ID_AAC` — matched by **codec ID**, so both `"aac"` (built-in) and `"libfdk_aac"` pass | `PacketSinkError::EncoderNotWhitelisted` | `build()` |
 | `set_video_codec("copy")` / `set_audio_codec("copy")`, or a stream mapped via `add_stream_map_with_copy` | `PacketSinkError::StreamCopyUnsupported` | `build()` |
 | Container-only setters: `set_format`, `set_seek_callback`, `set_io_buffer_size`, `set_video_filter`, `set_video_bsf`/`set_audio_bsf`/`set_subtitle_bsf`, `set_format_opt`, `add_attachment`, `set_subtitle_codec`, `add_metadata`/`add_stream_metadata`/`add_chapter_metadata`/`add_program_metadata`, `map_metadata_from_input`, `disable_auto_copy_metadata`, the `"flags"` codec option | `PacketSinkError::UnsupportedOption` | `build()` |
@@ -353,4 +354,10 @@ Three runnable examples ship in the crate (`cargo run --example <name>`):
   something FFmpeg's own muxers already solve. See
   [streaming.md](streaming.md).
 - **Need HEVC, other codecs, or a passthrough (no validation) tier?** Still
-  not available as of 0.16 — the strict tier is H.264 (libx264 only) + AAC, v1.
+  not available as of 0.18 — the strict tier is H.264 (four verified wrappers:
+  `libx264`, `h264_nvenc`, `h264_videotoolbox`, `libopenh264`) + AAC, v1.
+  Admission is a **declarative registry**, not a per-packet check: each wrapper
+  earned its row by an audit of the FFmpeg 7.1/8.1 source (one packet per
+  encoded picture, out-of-band parameter sets under `GLOBAL_HEADER`, extradata
+  at init, monotonic dts). A future per-packet access-unit verifier would widen
+  admission beyond the registry.

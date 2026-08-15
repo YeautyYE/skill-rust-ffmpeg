@@ -396,9 +396,24 @@ let has_whip = capabilities::is_muxer_available("whip");
 let has_srt  = capabilities::is_output_protocol_available("srt");
 ```
 
-A `true` result only means the component is compiled into the linked FFmpeg —
-encoders, TLS backends, endpoint compatibility, and network reachability are all
-separate concerns.
+**Full probe set (0.18)** — all take an exact registry name and return `bool`:
+
+| Probe | Answers |
+|-------|---------|
+| `is_muxer_available(name)` | output format (`"whip"`, `"mpegts"`, `"hls"`) |
+| `is_input_protocol_available(name)` | **input**-side protocol (`"https"`, `"rtmp"`) |
+| `is_output_protocol_available(name)` | **output**-side protocol (`"srt"`, `"rtmp"`) |
+| `is_encoder_available(name)` | encoder wrapper (`"libx264"`, `"h264_nvenc"`) |
+| `is_decoder_available(name)` | decoder wrapper |
+| `is_filter_available(name)` | lavfi filter (`"zscale"`, `"libplacebo"`) — same answer as `hwaccel::is_filter_available` |
+| `is_filter_option_available(filter, option)` | one option on one filter — for options that exist only in newer FFmpeg |
+
+Input and output protocol namespaces are distinct — probe the side you will
+actually use. A `true` result only means the component is compiled into the
+linked FFmpeg: encoders, TLS backends, endpoint compatibility, and network
+reachability are all separate concerns. Probe **before** configuring a pipeline
+that depends on an optional component, so it fails fast with your own message
+instead of a mid-job FFmpeg errno.
 
 ## WHIP Output (WebRTC, FFmpeg 8+)
 
@@ -494,7 +509,7 @@ For async operations, enable the `async` feature and use `.await`:
 > **Dependencies**:
 > ```toml
 > [dependencies]
-> ez-ffmpeg = { version = "0.17.0", features = ["async"] }
+> ez-ffmpeg = { version = "0.18.0", features = ["async"] }
 > tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 > ```
 
