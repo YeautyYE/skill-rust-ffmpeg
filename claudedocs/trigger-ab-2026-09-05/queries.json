@@ -1,0 +1,182 @@
+[
+[
+"P01",
+"avformat_find_stream_info"
+],
+[
+"P02",
+"AVSEEK_SIZE custom seek callback"
+],
+[
+"P03",
+"视频转码"
+],
+[
+"P04",
+"Wie transkodiere ich ein Video in Rust?"
+],
+[
+"P05",
+"make this video smaller in Rust"
+],
+[
+"P06",
+"ez-ffmpeg vs ffmpeg-next"
+],
+[
+"P07",
+"EBU R128 integrated loudness"
+],
+[
+"P08",
+"v4l2 camera capture"
+],
+[
+"P09",
+"FrameExtractor RGB output changed"
+],
+[
+"P10",
+"PacketSink avcC AudioSpecificConfig"
+],
+[
+"P11",
+"from_cli_args emits Rust code"
+],
+[
+"P12",
+"StreamMap -c:v:0"
+],
+[
+"P13",
+"WHIP capability probe"
+],
+[
+"P14",
+"h264_mp4toannexb"
+],
+[
+"P15",
+"set_video_filter"
+],
+[
+"P16",
+"WGSL chroma key"
+],
+[
+"P17",
+"burn subtitles without libass in Rust"
+],
+[
+"P18",
+"video plus longer music track -shortest"
+],
+[
+"P19",
+"blackdetect silencedetect QC pass"
+],
+[
+"P20",
+"HDR to SDR washed out colors"
+],
+[
+"P21",
+"progress bar for a Rust transcode"
+],
+[
+"P22",
+"generate a test video with testsrc"
+],
+[
+"P23",
+"embedded RTMP server in Rust"
+],
+[
+"P24",
+"whisper PCM 16 kHz mono ingest"
+],
+[
+"P25",
+"thumbnail sprite sheet recipe"
+],
+[
+"H01",
+"make an animated GIF from an mp4 in Rust"
+],
+[
+"H02",
+"capture from avfoundation on macOS in Rust"
+],
+[
+"H03",
+"build an ABR ladder for HLS in Rust"
+],
+[
+"H04",
+"write chapters and metadata into an mp4 with Rust"
+],
+[
+"H05",
+"10-bit VP9 encode in Rust"
+],
+[
+"H06",
+"AVPacket lifetime and av_packet_unref in ffmpeg-sys-next"
+],
+[
+"H07",
+"scene change detection in a Rust transcode pipeline"
+],
+[
+"H08",
+"get decoded video frames as tensors for a PyTorch model from Rust"
+],
+[
+"H09",
+"aac_adtstoasc when remuxing to mp4 in Rust"
+],
+[
+"H10",
+"forced keyframes every 2 seconds for HLS segments in Rust"
+],
+[
+"N01",
+"resize a PNG to 256x256 with the image crate"
+],
+[
+"N02",
+"trim a video with moviepy in Python"
+],
+[
+"N03",
+"build a GStreamer pipeline with appsrc in Rust"
+],
+[
+"N04",
+"set up STUN/TURN for my WebRTC signaling server in Go"
+],
+[
+"N05",
+"write a low-latency sine synthesizer with cpal"
+],
+[
+"N06",
+"should we add video upload to our SaaS product?"
+],
+[
+"N07",
+"write a README for my new Rust crate"
+],
+[
+"N08",
+"implement a REST endpoint in axum"
+],
+[
+"N09",
+"what's the difference between Vec and VecDeque"
+],
+[
+"N10",
+"convert this PDF to markdown"
+]
+]

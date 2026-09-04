@@ -6,12 +6,14 @@ after triggering; all when-to-use info must live in the description). A
 change ships only if this corpus passes the lexical-anchor check below and
 any newly accepted misses are recorded in the table.
 
-**Method**: for each query, the listed anchor tokens must appear (case-
-insensitive substring) in the description, OR the row is explicitly marked
+**Method**: for each query, one of the listed anchor tokens must appear
+(case-insensitive, whole-token) inside the first 1536 characters of the
+description — the window Claude Code actually shows — OR the row is marked
 `SEMANTIC` (broad-intent wording expected to match without a literal token —
 a judgment, not a guarantee) or `ACCEPTED-MISS` (deliberate, recorded loss).
-Run: `python3 claudedocs/check_trigger_corpus.py` (inline in repo history;
-re-create from this table if lost).
+The description must also be ≤ 1024 characters (Agent Skills spec cap).
+Run: `python3 claudedocs/check_trigger_corpus.py` (exit 0 = shippable;
+`--text file` checks a candidate before editing SKILL.md).
 
 **Origin**: agent-ux red-team walkthrough (UX-1, Evidence Protocol run
 ep-20260726T183134) + Phase-3 additions. 9 of the original 16 queries were
@@ -57,9 +59,28 @@ description must keep them alive.
 | `watchdog`, `retry logic`, `timeout` | generic async-ops vocabulary | not FFmpeg-specific; `async transcode` remains |
 | release/version annotations (`0.14`/`0.15`/`0.16`, `experimental`) | metadata noise | trigger value unverified (TE-5); versions live in SKILL.md body |
 
+## Accepted misses (1024-char rewrite, 2026-09-05)
+
+239 words / 1959 chars → 112 words / 1020 chars. Trigger evidence:
+`claudedocs/trigger-ab-2026-09-05/` (3 arms × 3 models × 45 queries; the new
+text scores 25/25 corpus, 10/10 held-out, 0/10 false positives on every
+model, while the shipped text *as Claude Code truncates it at 1536 chars*
+lost `from_cli_args` and `whisper PCM` on Haiku).
+
+| Dropped token(s) | Class | Rationale |
+|------------------|-------|-----------|
+| `encode`, `decode`, `convert format`, `resize`, `crop`, `merge`, `overlay`, `rotate`, `fade`, `batch convert`, `extract audio`, `normalize loudness` | generic verbs | covered by "any Rust video/audio task" + `transcode`/`trim`/`concat`/`watermark`; H01–H05 held-out queries all still routed |
+| `animated GIF`, `image sequences`, `metadata and chapters`, `srt`/`ass`/`vtt`, `microphone`, `directshow` | operation nouns | `subtitle`, `capture`, `thumbnail` cluster anchors remain; H01/H04 verified |
+| `ABR ladder`, `fMP4`, `live broadcast`, `jitter buffer`, `CUDA`, `beauty filter`, `VP9`, `10-bit`, `HDR10`, `scene detection`, `true peak`, `duration`, `resolution`, `codec info`, `sine` | sibling terms inside kept clusters | one anchor per cluster kept (`HLS`, `SRT`, `NVENC`, `chroma key`, `HEVC`, `cropdetect`, `LUFS`, `ffprobe`, `testsrc`); H03/H05/H07 verified |
+| `AVPacket`, `AVFormatContext`, `AVCodecID`, `av_log`, `mux`, `demux`, `filter graph`, `aac_adtstoasc`, `forced keyframes`, `async transcode` | C-API / concept siblings | `AVFrame`, `avformat_find_stream_info`, `AVSEEK_SIZE`, `EAGAIN`, `custom I/O`, `h264_mp4toannexb` remain; H06/H09/H10 verified |
+| `frame to tensor`, `AudioSpecificConfig`, `RTP packetizer`, `fMP4 segmenter` | export-API siblings | `FrameExtractor`/`SampleExtractor`/`whisper PCM`, `PacketSink`/`WebCodecs`/`avcC` remain; H08 verified |
+| `which-library`, `feasibility review` | phrasing | `compare (X vs Y)`, `review`, `migrate` remain; P06 verified |
+
 ## Maintenance rule (ends the append-only convention)
 
 Adding a trigger spelling to the description requires: (a) replacing or
-consolidating existing text — net word count must stay ≤ 300; (b) adding a
-corpus row here demonstrating the query class it serves; (c) re-running the
-anchor check. Never append numbered release groups.
+consolidating existing text — total length must stay ≤ 1024 characters
+(`check_trigger_corpus.py` fails otherwise); (b) adding a corpus row here
+demonstrating the query class it serves; (c) re-running the checker. Never
+append numbered release groups. Key use case stays first: Claude Code trims
+from the tail when the skill listing overflows its budget.
